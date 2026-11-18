@@ -1,0 +1,25 @@
+=== 1. Cobertura ===
+Filmes do MovieLens encontrados no IMDb: 62,294 de 62,423
+sem gênero: 5,062 filmes; no IMDb: 5,047; com gênero do IMDb convertível: 4,822; com ano no IMDb: 5,047
+sem gênero e com avaliação: 4,568 filmes; no IMDb: 4,553; com gênero do IMDb convertível: 4,335; com ano no IMDb: 4,553
+sem ano: 412 filmes; no IMDb: 410; com gênero do IMDb convertível: 401; com ano no IMDb: 409
+Tipo de título no IMDb dos filmes sem gênero: {'movie': 3684, 'short': 628, 'tvMovie': 383, 'video': 149, 'tvEpisode': 67, 'tvMiniSeries': 64}
+Avaliações dos filmes sem gênero que o IMDb preenche: 25,221 de 26,627
+
+=== 2. Concordância de gêneros (filmes com gênero nas duas fontes) ===
+Filmes comparados: 57,100
+Pelo menos um gênero em comum: 97.7%; mesmos gêneros: 46.9%; Jaccard médio: 0.719
+Por gênero do MovieLens: % dos filmes que o IMDb também marca com ele
+  Animation 98; Documentary 96; Comedy 94; Drama 92; Horror 88; Crime 87; Adventure 83; Action 81; Film-Noir 73; Western 73; Romance 69; Mystery 67; Sci-Fi 64; Fantasy 63; Children 63; War 58; Thriller 54; Musical 48
+IMDb com Music (sem Musical): 1,879 filmes; destes, o MovieLens marca Musical em 15% e Documentary em 33%
+
+=== 3. Concordância de ano (filmes com ano nas duas fontes) ===
+Filmes comparados: 61,880; ano igual: 92.8%; diferença de até 1 ano: 99.0%; mais de 1 ano: 644
+
+=== 4. Teste externo do kNN nos filmes sem gênero ===
+avaliadores  filmes  chutar Drama %  1/√N %  kNN %
+        1–2    2774            52.1    48.2   43.8
+        3–4     835            52.5    53.1   52.6
+        5–9     425            51.8    54.1   63.8
+      10–49     265            48.7    48.7   66.4
+        50+      36            58.3    58.3   77.8

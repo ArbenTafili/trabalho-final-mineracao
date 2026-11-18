@@ -15,8 +15,9 @@ notebook/             notebook montado, com as saídas da última execução no 
 scripts/              montar, executar, baixar dados, dados sintéticos, números de controle, conferência manual
 tests/                testes (estrutura e execução com dados sintéticos)
 conferencia_manual/   tabelas conferidas à mão no IMDb/TMDb (lidas pelo notebook)
+analises/             medições exploratórias que embasam as decisões (fora do notebook)
 docs/decisoes.md      registro das decisões e dos votos da mesa de avaliação
-dados/                MovieLens 25M (fora do git)
+dados/                MovieLens 25M e arquivo do IMDb (fora do git)
 execucoes/            execuções locais (fora do git)
 ```
 
@@ -46,7 +47,7 @@ brew install python@3.13 openjdk@21
 .venv/bin/python scripts/baixar_dados.py
 ```
 
-O último comando baixa o arquivo oficial do GroupLens (262 MB), confere o MD5 e descompacta em `dados/ml-25m`. Em Linux ou Windows: Python 3.13, Java 17 ou 21 e a variável `JAVA_HOME` apontando para o Java.
+O último comando baixa o arquivo oficial do GroupLens (262 MB), confere o MD5 e descompacta em `dados/ml-25m`. Com `--imdb`, baixa também o `title.basics` do IMDb (231 MB), usado para os gêneros e anos que faltam no MovieLens, e grava a data e o MD5 do download. Em Linux ou Windows: Python 3.13, Java 17 ou 21 e a variável `JAVA_HOME` apontando para o Java.
 
 ## Fluxo de trabalho
 

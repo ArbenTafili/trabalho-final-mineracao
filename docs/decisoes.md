@@ -4,11 +4,13 @@ Cada mudança no trabalho segue o mesmo caminho:
 
 1. a ideia é proposta (pelo aluno, pela dupla ou pelo Claude) com os números reais da base;
 2. o aluno filtra o que vai adiante;
-3. uma **mesa de avaliação** com cinco pontos de vista vota cada ideia:
+3. uma **mesa de avaliação** simulada (agente de IA independente, que não participou das propostas) vota cada ideia. Até 18/11/2026 ela teve cinco membros (professor de Mineração de Dados, estatístico, engenheiro de dados, especialista em sistemas de recomendação e colega de turma). A partir da proposta 2-B, tem sete:
    - professor de Mineração de Dados (rigor do KDD);
-   - estatístico (viés e validação);
+   - professor de IA / Aprendizado de Máquina (métodos, validação, vazamento);
+   - professor de Banco de Dados (chaves, integridade, junções, duplicatas);
+   - cientista de dados (se a decisão compensa na prática);
    - engenheiro de dados (reprodutibilidade);
-   - especialista em sistemas de recomendação (sentido para P1/P2);
+   - estatístico (viés, amostragem, se os números sustentam a conclusão);
    - colega de turma (dá para explicar e conferir à mão?);
 4. os ajustes pedidos pela mesa voltam ao aluno, e só então a ideia é implementada.
 
@@ -56,7 +58,13 @@ Os critérios de cada decisão são fixados **antes** de ver o resultado.
 
 A regra 1/√N não passa 10 pontos acima do chute em nenhuma faixa; o kNN passa a partir de 5 avaliadores. Uma regra de "perfil típico do gênero" (centróide, similaridade do cosseno) ficou abaixo do chute e foi descartada. Peso 1/N (α = 1) acerta menos de 2%.
 
-**Proposta revisada, em discussão com o aluno:** o kNN continua como método principal; o mínimo de avaliadores deixa de ser fixo (10) e passa a ser a menor faixa em que o método supera o chute por pelo menos 10 pontos, medida pelo próprio notebook; a regra 1/√N entra como comparação. Pela medição acima, o preenchimento passaria de 320 para 781 filmes e de 63% para 74% das avaliações de filmes sem gênero.
+**Rodada 2 (proposta revisada), 18/11/2026: aprovada com ajustes por unanimidade (5 de 5).** O kNN continua como método principal; o mínimo de avaliadores deixa de ser fixo (10) e passa a ser calculado pelo código: a menor faixa a partir da qual todas as faixas superiores superam o chute por pelo menos 10 pontos. O valor de 10 pontos vem da regra da v5, fixada antes da execução real; aplicá-lo por faixa foi decidido depois da medição exploratória. Ajustes: média e DP também nas faixas abaixo de 10; amostra da faixa 5–9 conferida no IMDb; mínimo e total preenchido nos números de controle; explicar o peso 1/N; coluna que marca o gênero imputado; exemplo passo a passo com um filme da faixa 5–9; papel definido para o erro do Naive Bayes. Medição com 5 partes em `analises/resultados_imputacao_por_faixa.txt`: kNN 58,7% ± 0,2 na faixa 5–9 (chute 43,7%); mínimo calculado = 5. O peso 1/N escolhe IMAX em 56% dos casos (é o menor gênero, 195 filmes), por isso acerta tão pouco.
+
+**Proposta 2-B (IMDb + kNN), aguardando a mesa de 7.** O aluno perguntou se os ~4 mil filmes que continuariam `Unknown` não poderiam ser preenchidos. Com 1–2 avaliadores nenhum método baseado no público supera o chute; é falta de informação. A proposta usa o gênero oficial do IMDb (`title.basics`, pelo código da tabela `links`) como fonte principal e mantém o kNN como método de mineração, validado contra o IMDb e usado onde o IMDb não tem gênero. Medições em `analises/resultados_imdb.txt`:
+- o IMDb preenche 4.822 dos 5.062 filmes sem gênero (95%; 25.221 das 26.627 avaliações);
+- nos 57.100 filmes com gênero nas duas fontes, 97,7% têm pelo menos um gênero em comum (mesmos gêneros: 46,9%; Jaccard médio 0,719; menor concordância em Musical, 48%);
+- "Music" do IMDb não é convertido para Musical: só 15% desses filmes são Musical no MovieLens;
+- teste externo do kNN nos próprios filmes sem gênero: 63,8% na faixa 5–9 (chute 51,8%), 66,4% em 10–49, 77,8% em 50+; com 1–4 avaliadores, igual ou pior que o chute.
 
 ## D3 — Títulos repetidos
 
@@ -75,7 +83,7 @@ A regra 1/√N não passa 10 pontos acima do chute em nenhuma faixa; o kNN passa
 
 ## D4 — Filmes sem ano no título e gêneros raros
 
-**Status:** aprovada com ajustes em 18/11/2026; aguardando permissão para baixar o arquivo do IMDb.
+**Status:** aprovada com ajustes em 18/11/2026; arquivo do IMDb baixado em 18/11/2026 (MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`). O IMDb tem ano para 409 dos 412 filmes sem ano. Nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0% (`analises/resultados_imdb.txt`).
 
 **Fatos medidos:** 412 filmes sem ano no título (11.749 avaliações; 264 deles também sem gênero), incluindo Ready Player One e Moonlight.
 
@@ -99,8 +107,6 @@ A regra 1/√N não passa 10 pontos acima do chute em nenhuma faixa; o kNN passa
 
 ## Pendências do aluno
 
-- Perda máxima de acerto aceita para trocar o kNN (D2).
 - Conferência manual dos 38 filmes (D2) e dos 8 pares (D3).
-- Permissão para baixar o `title.basics` do IMDb (D4).
 - Aprovação da D5 para ir à mesa.
 - Decisão sobre Musical e gêneros raros (agrupar só no vetor ou já no pré-processamento).
