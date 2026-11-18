@@ -40,7 +40,8 @@ for g in lista_generos:
 cols_prop = ["prop_" + sufixo[g] for g in lista_generos]
 atributos_estruturados = ["prop_avaliacoes_total", "nota_media", "nota_dp", "prop_positivas"] + cols_prop
 
-perfil_pd = perfil_completo.select("userId", "n_avaliacoes", *atributos_estruturados).toPandas()
+# Ordem fixa por userId: as amostras com semente (3.5 a 3.9) sorteiam os mesmos usuários em qualquer máquina.
+perfil_pd = perfil_completo.select("userId", "n_avaliacoes", *atributos_estruturados).orderBy("userId").toPandas()
 assert len(lista_generos) == 20 and "Unknown" in lista_generos
 assert len(perfil_pd) == perfil_pd.userId.nunique() == n_usuarios_total
 assert perfil_pd[atributos_estruturados].notna().all().all()

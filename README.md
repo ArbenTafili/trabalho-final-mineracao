@@ -55,11 +55,11 @@ O último comando baixa o arquivo oficial do GroupLens (262 MB), confere o MD5 e
    ```bash
    .venv/bin/pytest -m "not lento"
    ```
-3. **Teste com dados sintéticos** (cerca de 3 minutos no M1 Pro, pico de 1,8 GB de memória): gera um MovieLens pequeno com os casos de borda (filmes sem gênero, com 9 e 10 avaliadores, sem ano, títulos repetidos, IMAX) e executa o notebook inteiro.
+3. **Teste com dados sintéticos** (cerca de 2 minutos no M1 Pro, pico de 1,8 GB de memória): gera um MovieLens pequeno com os casos de borda (filmes sem gênero, com 9 e 10 avaliadores, sem ano, títulos repetidos, IMAX) e executa o notebook inteiro.
    ```bash
    .venv/bin/pytest
    ```
-4. **Execução completa local, opcional** (tempo e memória sendo medidos): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória.
+4. **Execução completa local, opcional** (cerca de 9 minutos no M1 Pro, pico de 3,6 GB; no Colab gratuito leva uns 22): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória. Com `--nucleos 2`, o Spark usa 2 núcleos, como no Colab.
    ```bash
    .venv/bin/python scripts/executar_notebook.py --dados dados/ml-25m
    ```
@@ -100,6 +100,16 @@ A execução roda em segundo plano na própria máquina do Colab, com `jupyter n
 
 - [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com cinco pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
 - [`conferencia_manual/`](conferencia_manual/COMO_PREENCHER.md): filmes sem gênero e títulos repetidos conferidos à mão no IMDb e no TMDb.
+
+## Reprodutibilidade
+
+Os resultados não dependem da máquina nem do número de núcleos. O Spark devolve as linhas numa ordem que muda com os núcleos, então:
+
+- antes de qualquer sorteio com semente (amostras da 3.5 à 3.9 e validação cruzada da 2.2-b), os dados são ordenados por `userId` ou `movieId`;
+- a amostra de notas (1.5-b, 2.4) é sorteada pelo hash de `userId` e `movieId`, e não pela divisão interna do Spark;
+- os quantis da seção 1 são exatos, não aproximados.
+
+Conferido em 18/11/2026: com os dados reais, as execuções com 8 e com 2 núcleos deram os 15 números de controle idênticos. Só os tempos da 3.9 mudam, porque dependem da máquina.
 
 ## Números de controle
 

@@ -52,12 +52,14 @@ class MedidorMemoria(threading.Thread):
         self._parar.set()
 
 
-def executar(dados, saida, timeout=None):
+def executar(dados, saida, timeout=None, nucleos=None):
     dados = Path(dados).resolve()
     if not (dados / "ratings.csv").is_file():
         sys.exit(f"ratings.csv não encontrado em {dados}")
     nb, _, _ = montar()
     os.environ["MOVIELENS_DIR"] = str(dados)
+    if nucleos:  # ex.: 2, como no Colab gratuito
+        os.environ["PYSPARK_SUBMIT_ARGS"] = f"--master local[{nucleos}] pyspark-shell"
     os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
     if "JAVA_HOME" not in os.environ and JAVA_BREW.exists():
         os.environ["JAVA_HOME"] = str(JAVA_BREW)
@@ -71,8 +73,11 @@ def executar(dados, saida, timeout=None):
         cabecalho = cell.source.splitlines()[0][:70] if cell.source else ""
         print(f"  [{cell_index:3d}] {time.time() - inicio_cel[cell_index]:7.1f}s  {cabecalho}", flush=True)
 
+    # capture_fd_output=False: a barra de progresso e os avisos da JVM do Spark não entram nas saídas,
+    # como no Colab.
     cliente = NotebookClient(nb, timeout=timeout, kernel_name="python3", allow_errors=False,
                              resources={"metadata": {"path": str(trabalho)}},
+                             extra_arguments=["--IPKernelApp.capture_fd_output=False"],
                              on_cell_execute=antes, on_cell_executed=depois)
     medidor = MedidorMemoria()
     medidor.start()
@@ -101,8 +106,9 @@ def main():
     p.add_argument("--dados", required=True, help="pasta com movies.csv, ratings.csv, tags.csv e links.csv")
     p.add_argument("--saida", default=str(RAIZ / "execucoes" / f"execucao_{datetime.now():%Y%m%d_%H%M}.ipynb"))
     p.add_argument("--timeout", type=int, default=None, help="limite por célula, em segundos (padrão: sem limite)")
+    p.add_argument("--nucleos", type=int, default=None, help="núcleos do Spark (padrão: todos; o Colab gratuito tem 2)")
     a = p.parse_args()
-    executar(a.dados, a.saida, a.timeout)
+    executar(a.dados, a.saida, a.timeout, a.nucleos)
 
 
 if __name__ == "__main__":

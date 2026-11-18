@@ -257,7 +257,10 @@ print(medidas_nota.to_string(index=False))
 # %%
 # [1.5-b] Boxplot e violin plot da nota em amostra aleatória simples
 FRACAO_AMOSTRA_NOTAS = 0.004  # cerca de 100 mil avaliações
-amostra_pd = ratings_sel.sample(False, FRACAO_AMOSTRA_NOTAS, seed=42).select("rating").toPandas()
+# Sorteio pelo hash de (userId, movieId, semente 42): cada avaliação tem a mesma chance de entrar e a amostra é a
+# mesma em qualquer máquina, porque não depende de como o Spark divide os dados.
+sorteio = F.abs(F.xxhash64("userId", "movieId", F.lit(42))) % 1_000_000
+amostra_pd = ratings_sel.where(sorteio < FRACAO_AMOSTRA_NOTAS * 1_000_000).select("rating").toPandas()
 
 import inspect
 
@@ -457,8 +460,8 @@ print("Moda do atributo gênero:", genres_freq.first()["genre"])
 
 for rotulo, chave in [("usuário", "userId"), ("filme", "movieId")]:
     suporte = ratings_sel.groupBy(chave).count()
-    q = suporte.approxQuantile("count", [0.0, 0.25, 0.5, 0.75, 1.0], 0.005)
-    print(f"Avaliações por {rotulo} (mín, Q1, mediana, Q3, máx; quantis aproximados): {q}")
+    q = suporte.approxQuantile("count", [0.0, 0.25, 0.5, 0.75, 1.0], 0.0)  # erro 0: quantis exatos
+    print(f"Avaliações por {rotulo} (mín, Q1, mediana, Q3, máx): {q}")
 
 filmes_sem_avaliacao = movies_sel.join(ratings_sel.select("movieId").distinct(), "movieId", "left_anti").count()
 print(f"Filmes do catálogo sem nenhuma avaliação: {filmes_sem_avaliacao:,} de {total_filmes:,}")
@@ -504,7 +507,7 @@ eta2_ano = ss_entre_anos / ss_total_notas
 print(f"Razão de correlação ano da avaliação × nota: η={eta2_ano ** 0.5:.4f}; η²={eta2_ano:.4f}")
 
 atividade = ratings_sel.groupBy("userId").agg(((F.max("timestamp") - F.min("timestamp")) / 86400.0).alias("dias"))
-q_dias = atividade.approxQuantile("dias", [0.0, 0.25, 0.5, 0.75, 1.0], 0.005)
+q_dias = atividade.approxQuantile("dias", [0.0, 0.25, 0.5, 0.75, 1.0], 0.0)  # erro 0: quantis exatos
 print("Dias entre a primeira e a última avaliação de cada usuário (mín, Q1, mediana, Q3, máx):",
       [round(x, 1) for x in q_dias])
 

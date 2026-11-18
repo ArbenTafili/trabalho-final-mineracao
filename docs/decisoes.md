@@ -44,6 +44,20 @@ Os critérios de cada decisão são fixados **antes** de ver o resultado.
 - os 38 filmes sem gênero mais avaliados são conferidos à mão no IMDb e ficam com o gênero conferido; eles servem de teste externo;
 - mostrar no notebook um filme calculado passo a passo.
 
+**Medição exploratória (18/11/2026, fora do notebook).** Acerto (gênero previsto entre os verdadeiros) em filmes com gênero conhecido, por número de avaliadores. Faixas abaixo de 10: modelo treinado nos filmes com 10 ou mais; faixas de 10 em diante: validação cruzada de 5 partes. O kNN aqui usa a proporção de gêneros do público, não a média dos perfis da v5, por isso fica um pouco abaixo dos 83,4% do notebook.
+
+| Avaliadores | Filmes | Chutar Drama | Regra 1/√N | kNN (k = 15) |
+|---|---:|---:|---:|---:|
+| 1–2 | 15.026 | 42,7% | 40,5% | 42,5% |
+| 3–4 | 7.514 | 43,0% | 48,1% | 52,1% |
+| 5–9 | 7.929 | 43,7% | 47,6% | 59,0% |
+| 10–49 | 10.872 | 46,6% | 50,5% | 71,1% |
+| 50+ | 13.138 | 47,9% | 56,7% | 84,2% |
+
+A regra 1/√N não passa 10 pontos acima do chute em nenhuma faixa; o kNN passa a partir de 5 avaliadores. Uma regra de "perfil típico do gênero" (centróide, similaridade do cosseno) ficou abaixo do chute e foi descartada. Peso 1/N (α = 1) acerta menos de 2%.
+
+**Proposta revisada, em discussão com o aluno:** o kNN continua como método principal; o mínimo de avaliadores deixa de ser fixo (10) e passa a ser a menor faixa em que o método supera o chute por pelo menos 10 pontos, medida pelo próprio notebook; a regra 1/√N entra como comparação. Pela medição acima, o preenchimento passaria de 320 para 781 filmes e de 63% para 74% das avaliações de filmes sem gênero.
+
 ## D3 — Títulos repetidos
 
 **Status:** aprovada com ajustes em 18/11/2026; aguardando a conferência manual dos 8 pares.
