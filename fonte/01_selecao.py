@@ -8,11 +8,11 @@
 # %%
 # [1.1-a] Obtenção dos arquivos do MovieLens 25M (cópia local ou espelho documentado)
 from pathlib import Path
-import importlib.util, subprocess, sys
+import importlib.util, os, subprocess, sys
 for pacote in ('pyspark', 'huggingface_hub', 'matplotlib', 'pandas'):
     if importlib.util.find_spec(pacote) is None:
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-q', pacote])
-DATA_DIR = Path('ml-25m')
+DATA_DIR = Path(os.environ.get('MOVIELENS_DIR', 'ml-25m'))  # execução local: pasta indicada na variável
 arquivos = ['movies.csv', 'ratings.csv', 'tags.csv', 'links.csv']
 if not all((DATA_DIR / nome).is_file() for nome in arquivos):
     from huggingface_hub import hf_hub_download
@@ -956,7 +956,8 @@ for genero in ("action", "comedy", "drama"):
 atributos = ["prop_avaliacoes_total", "nota_media", "nota_dp", "prop_positivas",
              "prop_action", "prop_comedy", "prop_drama"]
 usuarios_pd = usuarios_features.select("userId", *atributos).toPandas()
-assert len(usuarios_pd) == usuarios_pd.userId.nunique() == 162541
+n_usuarios_total = ratings_sel.select("userId").distinct().count()
+assert len(usuarios_pd) == usuarios_pd.userId.nunique() == n_usuarios_total
 assert usuarios_pd[atributos].notna().all().all()
 assert usuarios_pd[[c for c in atributos if c.startswith("prop_")]].le(1).all().all()
 assert abs(usuarios_pd["prop_avaliacoes_total"].sum() - 1) < 1e-10

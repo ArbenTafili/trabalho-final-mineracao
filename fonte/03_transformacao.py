@@ -42,7 +42,7 @@ atributos_estruturados = ["prop_avaliacoes_total", "nota_media", "nota_dp", "pro
 
 perfil_pd = perfil_completo.select("userId", "n_avaliacoes", *atributos_estruturados).toPandas()
 assert len(lista_generos) == 20 and "Unknown" in lista_generos
-assert len(perfil_pd) == perfil_pd.userId.nunique() == 162541
+assert len(perfil_pd) == perfil_pd.userId.nunique() == n_usuarios_total
 assert perfil_pd[atributos_estruturados].notna().all().all()
 assert perfil_pd[cols_prop].ge(0).all().all() and perfil_pd[cols_prop].le(1).all().all()
 assert abs(perfil_pd["prop_avaliacoes_total"].sum() - 1) < 1e-10
@@ -148,7 +148,7 @@ plt.show()
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 X_p1_original = perfil_pd[atributos_p1].astype(float)
-assert X_p1_original.shape == (162541, 22)
+assert X_p1_original.shape == (n_usuarios_total, 22)
 assert np.isfinite(X_p1_original.to_numpy()).all()
 
 scaler_p1 = StandardScaler()
