@@ -1,0 +1,17 @@
+# Dados: a licença do MovieLens não permite redistribuir; o IMDb também fica fora.
+dados/
+*.zip
+*.tsv.gz
+ml-25m/
+movielens_mirror/
+
+# Ambiente e execuções locais
+.venv/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+execucoes/
+*.log
+
+# Sistema
+.DS_Store
