@@ -60,7 +60,19 @@ A regra 1/√N não passa 10 pontos acima do chute em nenhuma faixa; o kNN passa
 
 **Rodada 2 (proposta revisada), 18/11/2026: aprovada com ajustes por unanimidade (5 de 5).** O kNN continua como método principal; o mínimo de avaliadores deixa de ser fixo (10) e passa a ser calculado pelo código: a menor faixa a partir da qual todas as faixas superiores superam o chute por pelo menos 10 pontos. O valor de 10 pontos vem da regra da v5, fixada antes da execução real; aplicá-lo por faixa foi decidido depois da medição exploratória. Ajustes: média e DP também nas faixas abaixo de 10; amostra da faixa 5–9 conferida no IMDb; mínimo e total preenchido nos números de controle; explicar o peso 1/N; coluna que marca o gênero imputado; exemplo passo a passo com um filme da faixa 5–9; papel definido para o erro do Naive Bayes. Medição com 5 partes em `analises/resultados_imputacao_por_faixa.txt`: kNN 58,7% ± 0,2 na faixa 5–9 (chute 43,7%); mínimo calculado = 5. O peso 1/N escolhe IMAX em 56% dos casos (é o menor gênero, 195 filmes), por isso acerta tão pouco.
 
-**Proposta 2-B (IMDb + kNN), aguardando a mesa de 7.** O aluno perguntou se os ~4 mil filmes que continuariam `Unknown` não poderiam ser preenchidos. Com 1–2 avaliadores nenhum método baseado no público supera o chute; é falta de informação. A proposta usa o gênero oficial do IMDb (`title.basics`, pelo código da tabela `links`) como fonte principal e mantém o kNN como método de mineração, validado contra o IMDb e usado onde o IMDb não tem gênero. Medições em `analises/resultados_imdb.txt`:
+**Proposta 2-B (IMDb + kNN): aprovada com ajustes pela mesa de 7 em 18/11/2026 (6 aprovam com ajuste, 1 aprova).** Ajustes pedidos:
+- tabela inversa da conversão: para cada gênero do IMDb, % de filmes em que o MovieLens também marca o gênero correspondente, justificando cada linha da conversão;
+- integridade da junção: 1:1, códigos com 8 dígitos, amostra dos tvEpisode e tvMiniSeries conferida por título e ano, os 644 anos com diferença maior que 1 como indicador de qualidade da chave (sem correção automática);
+- colunas originais intactas; colunas novas de gênero final, ano final e origem de cada um;
+- dizer quantos dos 240 filmes sem gênero convertível têm 5 ou mais avaliadores; se forem poucos, o kNN fica como método validado, sem etapa de reserva;
+- declarar que o acerto externo é concordância com o IMDb, comentar a queda da vantagem do kNN entre a validação interna e a externa e explicar a mudança nos números da regra 1/√N (N medido no catálogo inteiro na primeira medição e só nos filmes de treino na segunda);
+- comparar por origem a média de gêneros por filme e a frequência de Thriller e Musical; dizer como um filme de um só gênero entra no perfil da P1;
+- guardar o recorte do IMDb usado num local privado da dupla e medir o tempo extra no Colab;
+- apresentar a conferência manual como verificação da chave.
+
+Verificações feitas logo depois da votação: a junção é 1:1 (nenhum código IMDb repetido em nenhum dos lados); os 129 filmes não encontrados têm códigos com 3 a 8 dígitos e somam 17.085 avaliações, quase todos de filmes que já têm gênero; dos 240 filmes sem gênero convertível, só 55 têm 5 ou mais avaliadores (1.065 avaliações), e a maioria é curta-metragem (gênero "Short" no IMDb, 145 filmes).
+
+Texto da proposta, como foi à mesa: O aluno perguntou se os ~4 mil filmes que continuariam `Unknown` não poderiam ser preenchidos. Com 1–2 avaliadores nenhum método baseado no público supera o chute; é falta de informação. A proposta usa o gênero oficial do IMDb (`title.basics`, pelo código da tabela `links`) como fonte principal e mantém o kNN como método de mineração, validado contra o IMDb e usado onde o IMDb não tem gênero. Medições em `analises/resultados_imdb.txt`:
 - o IMDb preenche 4.822 dos 5.062 filmes sem gênero (95%; 25.221 das 26.627 avaliações);
 - nos 57.100 filmes com gênero nas duas fontes, 97,7% têm pelo menos um gênero em comum (mesmos gêneros: 46,9%; Jaccard médio 0,719; menor concordância em Musical, 48%);
 - "Music" do IMDb não é convertido para Musical: só 15% desses filmes são Musical no MovieLens;
