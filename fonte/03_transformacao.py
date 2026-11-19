@@ -956,9 +956,9 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,16 s para 1.000 buscas kNN no PCA revisado, contra 0,90 s da varredura linear. A ball-tree não ganha da varredura.
-# - **Espaços z (20 ou 22 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 7,8 a 11,3 s; ball-tree 16,5 a 18,5 s; varredura 0,7 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
-# - **HNSW:** 1.000 buscas em 0,025 a 0,035 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (8 a 12 s).
+# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,14 s para 1.000 buscas kNN no PCA revisado, contra 0,72 s da varredura linear. A ball-tree não ganha da varredura.
+# - **Espaços z (20 ou 22 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 7,5 a 12,5 s; ball-tree 17,3 a 17,4 s; varredura 0,9 a 1,1 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
+# - **HNSW:** 1.000 buscas em 0,020 a 0,074 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (8,7 a 15,7 s).
 # - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA revisado e 99,7% no PCA base, contra 92,6% e 89,3% nos espaços z. Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, 59,9% contra 45,8%.
 #
 # **Limitação:** os tempos dependem da máquina (Colab gratuito); a fração de distâncias evitadas não.
@@ -1004,6 +1004,6 @@ plt.show()
 # - **Valores atípicos:** 1.365 usuários (0,84%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Unknown, Documentary, Western e Film-Noir). Foram mantidos e marcados.
 # - **Tendência de agrupamento:** estatística de Hopkins de 0,710 (PCA) e 0,765 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
 # - **Vetor revisado (3.8):** proporções fracionárias, gêneros raros agrupados, sem `Unknown` e com cinco atributos derivados. Retém a mesma variância em 6 componentes, tem 21% menos atípicos (1.076) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
-# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,16 s (varredura: 0,90 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
+# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,14 s (varredura: 0,72 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
 #
 # **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda a mesma variância em menos dimensões, gera menos atípicos e não depende de `Unknown` nem da contagem dupla de gêneros. O PCA do vetor base e as matrizes z-score ficam como comparação. As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.

@@ -60,7 +60,7 @@ O último comando baixa o arquivo oficial do GroupLens (262 MB), confere o MD5 e
    ```bash
    .venv/bin/pytest
    ```
-4. **Execução completa local, opcional** (cerca de 9 minutos no M1 Pro, pico de 3,6 GB; no Colab gratuito leva uns 22): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória. Com `--nucleos 2`, o Spark usa 2 núcleos, como no Colab.
+4. **Execução completa local, opcional** (cerca de 4 minutos no M1 Pro, pico de 4,1 GB; no Colab gratuito leva uns 30): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória. Com `--nucleos 2`, o Spark usa 2 núcleos, como no Colab.
    ```bash
    .venv/bin/python scripts/executar_notebook.py --dados dados/ml-25m
    ```
@@ -115,22 +115,22 @@ O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial)
 
 ## Decisões e conferência manual
 
-- [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com cinco pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
+- [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com sete pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
 - [`conferencia_manual/`](conferencia_manual/COMO_PREENCHER.md): filmes sem gênero e títulos repetidos conferidos à mão no IMDb e no TMDb.
 
 ## Reprodutibilidade
 
 Os resultados não dependem da máquina nem do número de núcleos. O Spark devolve as linhas numa ordem que muda com os núcleos, então:
 
-- antes de qualquer sorteio com semente (amostras da 3.5 à 3.9 e validação cruzada da 2.2-b), os dados são ordenados por `userId` ou `movieId`;
+- antes de qualquer sorteio com semente (amostras da 3.5 à 3.9 e validação cruzada da 2.2-c), os dados são ordenados por `userId` ou `movieId`;
 - a amostra de notas (1.5-b, 2.4) é sorteada pelo hash de `userId` e `movieId`, e não pela divisão interna do Spark;
 - os quantis da seção 1 são exatos, não aproximados.
 
-Conferido em 18/11/2026: com os dados reais, as execuções com 8 e com 2 núcleos deram os 15 números de controle idênticos. Só os tempos da 3.9 mudam, porque dependem da máquina.
+Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os números de controle idênticos. Na v6, em 19/11/2026, o Mac (8 núcleos) e o Colab (2 núcleos) deram os 16 números idênticos. Só mudam os tempos da 3.9, que dependem da máquina, e a ordem em que aparecem dois gêneros empatados na lista de votos do exemplo da 2.2-c.
 
 ## Números de controle
 
-`scripts/numeros_controle.py` extrai 15 números que resumem a execução (avaliações, usuários, imputação, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Na v5 executada no Colab em 18/11/2026: 25.000.095 avaliações, 162.541 usuários, 320 filmes com gênero imputado, 1.409 usuários atípicos.
+`scripts/numeros_controle.py` extrai 16 números que resumem a execução (avaliações, usuários, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Na v6 executada no Colab em 19/11/2026: 25.000.095 avaliações, 162.541 usuários, 4.822 filmes com gênero do IMDb (240 continuam sem gênero), acerto do kNN de 83,35% nos filmes com 10 ou mais avaliadores e 1.365 usuários atípicos.
 
 ## Dados e licença
 
