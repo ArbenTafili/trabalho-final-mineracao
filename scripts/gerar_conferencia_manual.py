@@ -17,6 +17,7 @@ import pandas as pd
 RAIZ = Path(__file__).resolve().parents[1]
 SAIDA = RAIZ / "conferencia_manual"
 MIN_AVALIACOES = 50
+RECORTE_IMDB = RAIZ / "dados" / "imdb" / "imdb_recorte_movielens.tsv.gz"
 
 
 def imdb(i):
@@ -52,15 +53,23 @@ def main():
     m["title"] = m["title"].str.strip()
     SAIDA.mkdir(exist_ok=True)
 
-    # D2: filmes sem gênero mais avaliados
+    # D2: filmes sem gênero mais avaliados — conferência da chave: o código IMDb aponta para o filme certo?
     sem = m[(m["genres"] == "(no genres listed)") & (m["n_avaliacoes"] >= MIN_AVALIACOES)]
     sem = sem.sort_values("n_avaliacoes", ascending=False)
+    sem = sem.assign(tconst=sem["imdbId"].map(lambda i: f"tt{int(i):07d}"))
+    if RECORTE_IMDB.is_file():
+        recorte = pd.read_csv(RECORTE_IMDB, sep="\t", dtype=str, na_values="\\N", keep_default_na=False, quoting=3)
+        sem = sem.merge(recorte, on="tconst", how="left", suffixes=("", "_imdb"))
+    else:
+        sem = sem.assign(primaryTitle="", startYear="", titleType="", genres_imdb="")
     tabela = pd.DataFrame({
         "movieId": sem["movieId"], "titulo": sem["title"], "avaliacoes": sem["n_avaliacoes"],
         "link_imdb": sem["imdbId"].map(imdb),
-        "generos_no_imdb": "", "generos_movielens": "", "observacao": "",
+        "titulo_no_imdb": sem["primaryTitle"], "ano_no_imdb": sem["startYear"], "tipo_no_imdb": sem["titleType"],
+        "generos_no_imdb": sem["genres_imdb"],
+        "chave_confere": "", "observacao": "",
     })
-    salvar(tabela, "filmes_sem_genero_mais_avaliados.csv", ["generos_no_imdb", "generos_movielens", "observacao"])
+    salvar(tabela, "filmes_sem_genero_mais_avaliados.csv", ["chave_confere", "observacao"])
 
     # D3: títulos repetidos com o mesmo código TMDb
     rep = m[m.duplicated("title", keep=False) & m["tmdbId"].notna()]

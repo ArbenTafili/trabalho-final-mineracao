@@ -79,7 +79,9 @@ A execução roda em segundo plano na própria máquina do Colab, com `jupyter n
    ```bash
    .venv/bin/python scripts/montar_notebook.py --destino execucoes/para_colab.ipynb
    ```
-2. No Colab, abra um notebook qualquer, conecte o ambiente de execução e envie `para_colab.ipynb` pelo painel **Arquivos** (ele vai para `/content`).
+2. No Colab, abra um notebook qualquer, conecte o ambiente de execução e envie pelo painel **Arquivos** (eles vão para `/content`):
+   - `para_colab.ipynb`;
+   - `imdb_recorte_movielens.tsv.gz`, o recorte fixo do IMDb (ver abaixo). Sem ele, o notebook baixa a versão do dia do IMDb, e os números podem mudar na última casa.
 3. Numa célula, inicie a execução:
    ```
    !nohup jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=-1 --output executado /content/para_colab.ipynb > /content/execucao.log 2>&1 &
@@ -96,6 +98,20 @@ A execução roda em segundo plano na própria máquina do Colab, com `jupyter n
    ```bash
    .venv/bin/python scripts/montar_notebook.py --saidas ~/Downloads/executado.ipynb
    ```
+
+## Recorte do IMDb
+
+O gênero e o ano que faltam no MovieLens vêm do arquivo público `title.basics` do IMDb (seção 2.2-b). O IMDb publica só a versão do dia, então o notebook usa um **recorte fixo** com as 62.294 linhas dos filmes do MovieLens (1 MB):
+
+```bash
+.venv/bin/python scripts/baixar_dados.py --imdb
+```
+
+```bash
+.venv/bin/python scripts/recortar_imdb.py
+```
+
+O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial), com a data e o MD5 do arquivo de origem em `imdb_recorte_movielens.info`. A dupla guarda uma cópia num local privado (por exemplo, no Drive) para que as duas execuções usem o mesmo recorte. O recorte usado na v6 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`.
 
 ## Decisões e conferência manual
 
