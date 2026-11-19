@@ -81,7 +81,7 @@ print(resumo_perfil.round(4).to_string())
 # - **Volume:** o número de avaliações por usuário tem assimetria de 16,3 (média 153,8, mediana 71); a participação no total herda a mesma forma.
 # - **Nota:** a nota média tem assimetria −0,56 (média 3,68); o DP da nota é zero para 0,15% dos usuários, que deram sempre a mesma nota.
 # - **Gêneros comuns** (Drama, Comedy, Action, Thriller): distribuições próximas de simétricas, com menos de 0,4% de zeros.
-# - **Gêneros raros:** a maioria dos usuários tem proporção zero em Unknown (98,7%), Documentary (62,8%), Film-Noir (58,3%), Western (32,3%), IMAX (26,8%) e Musical (22,4%). A cauda dos poucos usuários que avaliam esses gêneros explica os valores z extremos de 3.3 e os atípicos de 3.7.
+# - **Gêneros raros:** a maioria dos usuários tem proporção zero em Unknown (99,5%), Documentary (62,8%), Film-Noir (58,3%), Western (32,3%), IMAX (26,8%) e Musical (22,4%). A cauda dos poucos usuários que avaliam esses gêneros explica os valores z extremos de 3.3 e os atípicos de 3.7.
 #
 # **Consequência:** os gêneros raros pedem tratamento próprio. O vetor revisado (3.8) os agrupa e tira `Unknown`, e a atividade entra em escala logarítmica.
 
@@ -310,9 +310,9 @@ print(f"Amostra fixa de {N_AMOSTRA_ID:,} usuários (semente 42)")
 print(tabela_id.round(2).to_string(index=False))
 
 # %% [markdown]
-# **Leitura dos resultados.** A dimensionalidade intrínseca estimada é de cerca de 13 no espaço padronizado de 22 atributos (12,8 a 14,2, conforme k) e de cerca de 7 no espaço PCA de 7 componentes. Os 22 atributos têm redundância, mas a estrutura dos dados não cabe em duas ou três dimensões.
+# **Leitura dos resultados.** A dimensionalidade intrínseca estimada é de cerca de 13 no espaço padronizado de 22 atributos (12,7 a 14,1, conforme k) e de cerca de 7 no espaço PCA de 7 componentes. Os 22 atributos têm redundância, mas a estrutura dos dados não cabe em duas ou três dimensões.
 #
-# **Consequência:** o PCA com 7 componentes (68,58% da variância) é uma redução útil para as distâncias, mas descarta parte da estrutura. O critério de 80% da variância (10 componentes) fica mais próximo da dimensionalidade intrínseca e é uma alternativa a testar em P1.
+# **Consequência:** o PCA com 7 componentes (68,41% da variância) é uma redução útil para as distâncias, mas descarta parte da estrutura. O critério de 80% da variância (10 componentes) fica mais próximo da dimensionalidade intrínseca e é uma alternativa a testar em P1.
 
 # %% [markdown]
 # ### 3.6 Visualização do espaço transformado
@@ -464,16 +464,16 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **(a) |z| > 3:** 31.863 usuários (19,60%) passam do limite em pelo menos um atributo. Nos dez atributos com mais casos, a fração vai de 1,30% a 2,07% (IMAX, Animation, Children, Sci-Fi e Horror lideram), bem acima dos 0,27% esperados numa normal. As proporções de gêneros raros são muito assimétricas: 28,1 em Unknown, 11,9 em Documentary e 9,6 em Film-Noir. Com caudas tão longas, a regra univariada marca a cauda de cada atributo, não casos isolados, e não serve sozinha como critério.
-# - **(b) Mahalanobis:** 4.008 usuários (2,47%) passam do quantil 0,999 da χ² com 7 graus de liberdade, cerca de 25 vezes os 163 esperados sob normalidade. A nuvem de usuários tem caudas mais pesadas que uma normal multivariada.
-# - **(c) Vizinhança:** o limite do percentil 99 (2,31) é 2,8 vezes a mediana da distância ao 10º vizinho (0,839).
-# - **Atípicos marcados:** 1.409 usuários (0,87%) estão longe do centro e isolados ao mesmo tempo. Outros 2.599 estão longe do centro, mas têm vizinhos próximos (possíveis nichos), e só 217 estão isolados perto do centro.
-# - **Quem são:** em quase todos, o atributo mais extremo é um gênero raro: Unknown (329 usuários, 23% dos atípicos), Documentary (207), Western (196) e Film-Noir (173). Eles avaliam menos filmes (mediana de 40 contra 71) e dão notas um pouco mais altas (mediana da média 3,79 contra 3,70). Com poucas avaliações, poucos filmes de um gênero raro bastam para gerar uma proporção extrema.
+# - **(a) |z| > 3:** 31.618 usuários (19,45%) passam do limite em pelo menos um atributo. Nos dez atributos com mais casos, a fração vai de 1,30% a 2,07% (IMAX, Animation, Children, Sci-Fi e Horror lideram), bem acima dos 0,27% esperados numa normal. As proporções de gêneros raros são muito assimétricas: 42,2 em Unknown, 12,0 em Documentary e 9,6 em Film-Noir. Com caudas tão longas, a regra univariada marca a cauda de cada atributo, não casos isolados, e não serve sozinha como critério.
+# - **(b) Mahalanobis:** 3.716 usuários (2,29%) passam do quantil 0,999 da χ² com 7 graus de liberdade, cerca de 23 vezes os 163 esperados sob normalidade. A nuvem de usuários tem caudas mais pesadas que uma normal multivariada.
+# - **(c) Vizinhança:** o limite do percentil 99 (2,24) é 2,7 vezes a mediana da distância ao 10º vizinho (0,825).
+# - **Atípicos marcados:** 1.365 usuários (0,84%) estão longe do centro e isolados ao mesmo tempo. Outros 2.351 estão longe do centro, mas têm vizinhos próximos (possíveis nichos), e só 261 estão isolados perto do centro.
+# - **Quem são:** em quase todos, o atributo mais extremo é um gênero raro: Unknown (247 usuários, 18% dos atípicos), Documentary (224), Western (196) e Film-Noir (183). Eles avaliam menos filmes (mediana de 41 contra 71) e dão notas um pouco mais altas (mediana da média 3,88 contra 3,70). Com poucas avaliações, poucos filmes de um gênero raro bastam para gerar uma proporção extrema.
 # - **Gráfico:** no plano CP1 × CP2 os atípicos se espalham pela borda, mas também se sobrepõem ao centro, porque se afastam sobretudo nos componentes 4 a 7, que carregam Western, Documentary, Film-Noir e Unknown.
 #
 # **Limitação:** os limiares (quantil 0,999 e percentil 99) são escolhas registradas, e a referência χ² supõe normalidade, que os dados não seguem.
 #
-# **Consequência:** os 1.409 usuários são mantidos e ficam marcados em `perfil_pd["atipico"]`, para que P1 seja executado com e sem eles. Além disso, `prop_unknown` não mede preferência, e sim falta de informação de gênero no catálogo, e, mesmo depois da imputação de 2.2-b, é o atributo dominante de 329 atípicos. P1 deve testar também a entrada sem esse atributo.
+# **Consequência:** os 1.365 usuários são mantidos e ficam marcados em `perfil_pd["atipico"]`, para que P1 seja executado com e sem eles. Além disso, `prop_unknown` não mede preferência, e sim falta de informação de gênero no catálogo, e, mesmo depois do preenchimento pelo IMDb (2.2-b), que deixa só 240 filmes e 1.406 avaliações sem gênero, é o atributo dominante de 247 atípicos: com variância quase nula, uma única avaliação de filme sem gênero gera valores z de até 76,8 (3.3). P1 deve testar também a entrada sem esse atributo.
 
 # %% [markdown]
 # #### Tendência de agrupamento
@@ -558,8 +558,8 @@ plt.show()
 # **Leitura dos resultados.**
 #
 # - **Controle:** com dados uniformes, H = 0,500 nos dois espaços, o que confirma o cálculo.
-# - **Domínio mín–máx:** H = 0,964 no PCA e 0,959 no z-score. Esses valores são inflados pelos extremos, que alargam o domínio dos pontos uniformes: sem os 1.409 atípicos, caem para 0,927 e 0,939.
-# - **Domínio robusto (percentis 1–99):** H = 0,715 no PCA e 0,766 no z-score; sem os atípicos, 0,702 e 0,762. O desvio-padrão entre repetições é no máximo 0,0033.
+# - **Domínio mín–máx:** H = 0,964 no PCA e 0,961 no z-score. Esses valores são inflados pelos extremos, que alargam o domínio dos pontos uniformes: sem os 1.365 atípicos, caem para 0,927 e 0,935.
+# - **Domínio robusto (percentis 1–99):** H = 0,710 no PCA e 0,765 no z-score; sem os atípicos, 0,701 e 0,763. O desvio-padrão entre repetições é no máximo 0,0036.
 # - **Distâncias:** no histograma, a distância de um usuário ao vizinho real mais próximo (w) fica, em geral, abaixo da distância de um ponto uniforme ao usuário mais próximo (u), mas as duas distribuições se sobrepõem em parte.
 #
 # **Interpretação:** os usuários estão mais concentrados do que pontos uniformes, e isso não é efeito dos atípicos, porque retirá-los quase não muda o H robusto. Mas a tendência é moderada: uma referência usual é H > 0,75 para tendência clara, e o espaço PCA fica abaixo dela. Junto com as projeções de 3.6, o quadro é de um núcleo denso com caudas, e não de grupos naturalmente separados.
@@ -589,9 +589,8 @@ plt.show()
 LIMITE_GENERO = 0.02  # gêneros com menos de 2% das avaliações (contagem fracionária) formam o grupo "raros"
 
 filmes_info = (ratings_clean.groupBy("movieId").agg(F.count("*").alias("n_filme"), F.avg("rating").alias("media_filme"))
-    .join(movies_clean.select("movieId", "title", "genres"), "movieId")
-    .withColumn("ano_txt", F.regexp_extract(F.trim(F.col("title")), r"\((\d{4})\)$", 1))
-    .withColumn("ano_lancamento", F.when(F.col("ano_txt") != "", F.col("ano_txt").cast("double")))
+    .join(movies_clean.select("movieId", "genres", "ano"), "movieId")
+    .withColumn("ano_lancamento", F.col("ano").cast("double"))  # ano do título ou, sem ele, do IMDb (2.2-b)
     .withColumn("n_generos_filme", F.size(F.split(F.col("genres"), r"\|")))
     .withColumn("log_n_filme", F.log10(F.col("n_filme")))
     .select("movieId", "media_filme", "ano_lancamento", "n_generos_filme", "log_n_filme")
@@ -701,8 +700,8 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Participação fracionária dos gêneros:** Drama 20,6%, Comedy 16,8%, Action 9,4%, Thriller 9,1%, Adventure 6,9% e Romance 6,7% lideram. Doze gêneros ficam acima do limite de 2%.
-# - **Gêneros raros:** War, Animation, Musical, Documentary, IMAX, Western e Film-Noir somam 7,8% das avaliações e formam o grupo `raros`. `Unknown` (0,04% depois da imputação de 2.2-b) sai do vetor.
+# - **Participação fracionária dos gêneros:** Drama 20,7%, Comedy 16,8%, Action 9,4%, Thriller 9,1%, Adventure 6,9% e Romance 6,7% lideram. Doze gêneros ficam acima do limite de 2%.
+# - **Gêneros raros:** War, Animation, Musical, Documentary, IMAX, Western e Film-Noir somam 7,85% das avaliações e formam o grupo `raros`. `Unknown` (0,006% depois do preenchimento pelo IMDb em 2.2-b) sai do vetor.
 # - **Atributos derivados:**
 #   - viés do usuário: média 0,08 e DP 0,44 (de −3,42 a 2,44). Em média, os usuários dão notas próximas da média de cada filme, mas alguns são sistematicamente rigorosos ou generosos;
 #   - atividade em log: média 1,92 (cerca de 83 avaliações), DP 0,44;
@@ -808,17 +807,17 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **PCA do vetor revisado:** 6 componentes por Kaiser-Guttman retêm 69,13% da variância, contra 7 componentes e 68,58% no vetor base. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos.
+# - **PCA do vetor revisado:** 6 componentes por Kaiser-Guttman retêm 69,13% da variância, contra 7 componentes e 68,41% no vetor base. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos.
 # - **Componentes:**
 #   - CP1 (20,8%): ação, aventura e ficção contra romance;
 #   - CP2 (15,1%): infantil e fantasia contra crime e suspense;
-#   - CP3 (11,6%): nota média e viés do usuário;
+#   - CP3 (11,5%): nota média e viés do usuário;
 #   - CP4 (8,6%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
 #   - CP5: gêneros raros e horror;
 #   - CP6: ano médio dos filmes vistos.
-# - **Distâncias:** no espaço PCA, o contraste relativo cai de 92,79 para 63,45 e a variância relativa, de 0,425 para 0,368: as distâncias ficam um pouco mais concentradas no vetor revisado. O contraste relativo depende só do par mais próximo e do mais distante da amostra, por isso oscila mais; a variância relativa usa todos os pares.
-# - **Dimensionalidade intrínseca:** 6,4 no PCA revisado e 12,1 no z revisado, contra 7,1 e 13,3 no vetor base.
-# - **Atípicos:** 1.076 no vetor revisado, contra 1.409 no base (−24%). Só 401 são atípicos nos dois (Jaccard 0,19). No vetor revisado, os atípicos se concentram em horror (333 usuários).
+# - **Distâncias:** no espaço PCA, o contraste relativo cai de 197,63 para 59,81 e a variância relativa, de 0,506 para 0,377: as distâncias ficam um pouco mais concentradas no vetor revisado. O contraste relativo depende só do par mais próximo e do mais distante da amostra, por isso oscila mais; a variância relativa usa todos os pares.
+# - **Dimensionalidade intrínseca:** 6,4 no PCA revisado e 12,0 no z revisado, contra 7,1 e 13,2 no vetor base.
+# - **Atípicos:** 1.076 no vetor revisado, contra 1.365 no base (−21%). Só 360 são atípicos nos dois (Jaccard 0,17). No vetor revisado, os atípicos se concentram em horror (336 usuários).
 # - **Hopkins (domínio robusto):** 0,68 no PCA revisado e 0,77 no z revisado, contra 0,71 e 0,77 no base. A tendência de agrupamento continua moderada.
 #
 # **Interpretação:** o vetor revisado guarda a mesma variância em menos dimensões, gera menos atípicos e acrescenta eixos interpretáveis (atividade, popularidade e época). As distâncias ficam um pouco mais concentradas, e a tendência de agrupamento fica próxima da do vetor base.
@@ -960,7 +959,7 @@ plt.show()
 # - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,16 s para 1.000 buscas kNN no PCA revisado, contra 0,90 s da varredura linear. A ball-tree não ganha da varredura.
 # - **Espaços z (20 ou 22 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 7,8 a 11,3 s; ball-tree 16,5 a 18,5 s; varredura 0,7 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
 # - **HNSW:** 1.000 buscas em 0,025 a 0,035 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (8 a 12 s).
-# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA revisado e 99,8% no PCA base, contra 92,7% e 90,4% nos espaços z. A seleção incremental supera a de variância máxima, sobretudo com poucos pivôs: com 2 pivôs no z revisado, 61,3% contra 49,5%.
+# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA revisado e 99,7% no PCA base, contra 92,6% e 89,3% nos espaços z. Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, 59,9% contra 45,8%.
 #
 # **Limitação:** os tempos dependem da máquina (Colab gratuito); a fração de distâncias evitadas não.
 #
@@ -975,7 +974,7 @@ plt.show()
 # | `X_p1_padronizado` | 22 atributos (média, DP e 20 proporções de gênero), z-score | entrada candidata interpretável |
 # | `X_p1_minmax` | os mesmos 22 atributos em [0, 1] | alternativa de escala |
 # | `X_p1_pca` | 7 componentes principais (critério de Kaiser-Guttman) | entrada candidata com dimensionalidade reduzida |
-# | `perfil_pd["atipico"]` | 1.409 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
+# | `perfil_pd["atipico"]` | 1.365 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
 # | `perfil_rev_pd` | atributos derivados, proporções fracionárias, gênero dominante e `atipico_rev` (1.076 usuários) | descrever os grupos do vetor revisado |
 # | `X_rev_padronizado` | 20 atributos do vetor revisado, z-score | entrada alternativa interpretável |
 # | `X_rev_pca` | 6 componentes do vetor revisado (Kaiser-Guttman, 69,13%) | **entrada principal de P1** |
@@ -984,27 +983,27 @@ plt.show()
 #
 # - **Seleção de características:** apenas `nota_media × prop_positivas` atingiu o limiar de redundância (Pearson 0,922; Spearman 0,946). O segundo par mais associado, `prop_animation × prop_children` (0,823 / 0,804), ficou abaixo do limiar, então os dois atributos foram mantidos.
 # - **Escalas:**
-#   - no z-score, cada atributo tem o mesmo peso na variância total (4,55%), mas gêneros raros geram valores extremos: máximos de 60,7 em Unknown, 47,2 em Documentary e 38,9 em Western;
-#   - no min-max, os gêneros mais frequentes dominam a distância: Action pesa 11,52% e Drama 10,10%, contra 0,23% de Documentary.
+#   - no z-score, cada atributo tem o mesmo peso na variância total (4,55%), mas gêneros raros geram valores extremos: máximos de 76,8 em Unknown, 47,1 em Documentary e 38,9 em Western;
+#   - no min-max, os gêneros mais frequentes dominam a distância: Action pesa 11,53% e Drama 10,11%, contra 0,23% de Documentary.
 # - **PCA:**
-#   - d′ = 7 por Kaiser-Guttman (68,58% da variância);
+#   - d′ = 7 por Kaiser-Guttman (68,41% da variância);
 #   - d′ = 2 por broken-stick;
 #   - d′ = 10 para 80% da variância acumulada.
-#   - Os dois primeiros componentes explicam 37,87% e opõem, respectivamente, perfis infantis/fantasia e ação/ficção científica contra romance/comédia.
+#   - Os dois primeiros componentes explicam 37,88% e opõem, respectivamente, perfis infantis/fantasia e ação/ficção científica contra romance/comédia.
 # - **Concentração de distâncias** (2.000 usuários, distância euclidiana):
 #
 #   | Espaço | Contraste relativo | Variância relativa |
 #   |---|---:|---:|
-#   | z-score, 22 atributos | 42,31 | 0,3865 |
-#   | min-max, 22 atributos | 24,55 | 0,3473 |
-#   | PCA, 7 componentes | 92,79 | 0,4250 |
+#   | z-score, 22 atributos | 81,62 | 0,4890 |
+#   | min-max, 22 atributos | 23,10 | 0,3602 |
+#   | PCA, 7 componentes | 197,63 | 0,5062 |
 #
 #   O espaço PCA foi o que menos concentrou as distâncias e o min-max, o que mais concentrou.
 #
 # - **Dimensionalidade intrínseca:** cerca de 13 no espaço z de 22 atributos. As projeções 2D mostram uma nuvem contínua, sem grupos isolados.
-# - **Valores atípicos:** 1.409 usuários (0,87%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Unknown, Documentary, Western e Film-Noir). Foram mantidos e marcados.
-# - **Tendência de agrupamento:** estatística de Hopkins de 0,715 (PCA) e 0,766 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
-# - **Vetor revisado (3.8):** proporções fracionárias, gêneros raros agrupados, sem `Unknown` e com cinco atributos derivados. Retém a mesma variância em 6 componentes, tem 24% menos atípicos (1.076) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
+# - **Valores atípicos:** 1.365 usuários (0,84%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Unknown, Documentary, Western e Film-Noir). Foram mantidos e marcados.
+# - **Tendência de agrupamento:** estatística de Hopkins de 0,710 (PCA) e 0,765 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
+# - **Vetor revisado (3.8):** proporções fracionárias, gêneros raros agrupados, sem `Unknown` e com cinco atributos derivados. Retém a mesma variância em 6 componentes, tem 21% menos atípicos (1.076) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
 # - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,16 s (varredura: 0,90 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
 #
 # **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda a mesma variância em menos dimensões, gera menos atípicos e não depende de `Unknown` nem da contagem dupla de gêneros. O PCA do vetor base e as matrizes z-score ficam como comparação. As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.

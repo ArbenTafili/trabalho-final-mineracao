@@ -72,9 +72,11 @@ links_schema = StructType([
     StructField("tmdbId", LongType(), True),
 ])
 
-movies_df = spark.read.csv(str(DATA_DIR / "movies.csv"), header=True, schema=movies_schema)
+# Os CSV do MovieLens escapam aspas dentro do texto duplicando-as ("My Friend ""A"" (2018)"), como no padrão CSV.
+# O Spark usa barra invertida por padrão; sem escape='"', 11 títulos ficariam com aspas sobrando e sem o ano no fim.
+movies_df = spark.read.csv(str(DATA_DIR / "movies.csv"), header=True, schema=movies_schema, escape='"')
 ratings_df = spark.read.csv(str(DATA_DIR / "ratings.csv"), header=True, schema=ratings_schema)
-tags_df = spark.read.csv(str(DATA_DIR / "tags.csv"), header=True, schema=tags_schema)
+tags_df = spark.read.csv(str(DATA_DIR / "tags.csv"), header=True, schema=tags_schema, escape='"')
 links_df = spark.read.csv(str(DATA_DIR / "links.csv"), header=True, schema=links_schema)
 
 datasets = {
@@ -550,7 +552,7 @@ plt.show()
 # - avaliações por filme, que separa gêneros com muitos filmes, mas pouca audiência;
 # - nota média ± desvio-padrão.
 #
-# `(no genres listed)` aparece em laranja: são filmes sem gênero, alguns com avaliações, candidatos à imputação (2.2-b). As tags ficam fora dos dados-alvo nesta fase: não são usadas em P1 nem em P2. A função de histograma definida aqui é usada nas seções seguintes.
+# `(no genres listed)` aparece em laranja: são filmes sem gênero, alguns com avaliações, que recebem gênero no pré-processamento (2.2-b). As tags ficam fora dos dados-alvo nesta fase: não são usadas em P1 nem em P2. A função de histograma definida aqui é usada nas seções seguintes.
 
 # %%
 # [1.6-c] Distribuição dos gêneros: filmes, avaliações, avaliações por filme e nota (média e desvio-padrão)
@@ -602,7 +604,7 @@ print(dist_generos.sort_values("%_avaliacoes", ascending=False)[
     ["genre", "filmes", "%_filmes", "avaliacoes", "%_avaliacoes", "avaliacoes_por_filme", "%_filmes_sem_avaliacao", "media", "dp"]
 ].round(3).to_string(index=False))
 
-# Filmes sem gênero: quantos têm avaliações e quantas avaliações têm (candidatos à imputação em 2.2-b).
+# Filmes sem gênero: quantos têm avaliações e quantas avaliações têm (recebem gênero em 2.2-b).
 sem_genero_pd = (movies_sel.filter(F.col("genres") == SEM_GENERO).select("movieId")
                  .join(ratings_sel.groupBy("movieId").count(), "movieId", "left").fillna(0).toPandas())
 for limite in (1, 10, 50):
@@ -644,7 +646,7 @@ plt.show()
 #
 # **Consequência:**
 #
-# - os filmes sem gênero com pelo menos 10 avaliações têm informação suficiente para estimar o gênero a partir de quem os avaliou (2.2-b); os demais têm poucas avaliações e continuam `Unknown`;
+# - o gênero que falta é buscado no IMDb pela tabela `links` (2.2-b), o que vale também para os filmes com poucas avaliações; quem avaliou o filme serve para validar esse gênero (kNN, 2.2-c), o que só funciona quando o filme tem avaliadores suficientes;
 # - os gêneros com pouca participação continuam como rótulos nos dados, porque são informação real do catálogo, e são agrupados no vetor revisado (3.8), para que não distorçam as distâncias.
 
 # %% [markdown]
@@ -958,7 +960,7 @@ for genero in ("action", "comedy", "drama"):
         F.coalesce(F.col("n_" + genero), F.lit(0)) / F.col("n_avaliacoes"))
 atributos = ["prop_avaliacoes_total", "nota_media", "nota_dp", "prop_positivas",
              "prop_action", "prop_comedy", "prop_drama"]
-usuarios_pd = usuarios_features.select("userId", *atributos).toPandas()
+usuarios_pd = usuarios_features.select("userId", *atributos).orderBy("userId").toPandas()  # ordem fixa para a amostra
 n_usuarios_total = ratings_sel.select("userId").distinct().count()
 assert len(usuarios_pd) == usuarios_pd.userId.nunique() == n_usuarios_total
 assert usuarios_pd[atributos].notna().all().all()
@@ -1214,7 +1216,7 @@ plt.show()
 # **Leitura dos resultados.**
 #
 # - **(a)** Todas as correlações testadas diferem de zero, com valor-p abaixo da precisão numérica e intervalos de confiança estreitos (por exemplo, r = 0,922, IC 95% de 0,922 a 0,923). Com 162.541 usuários, até r = −0,17 é significativo; a relevância depende do tamanho de r.
-# - **(b)** A ANOVA (F = 104,8) e o Kruskal-Wallis (H = 922,9) rejeitam a igualdade das médias por filme entre décadas (p ≈ 10⁻¹⁹⁰). O efeito é modesto (η² = 0,067).
+# - **(b)** A ANOVA (F = 104,9) e o Kruskal-Wallis (H = 923,4) rejeitam a igualdade das médias por filme entre décadas (p ≈ 10⁻¹⁹⁰). O efeito é modesto (η² = 0,067).
 # - **(c)** Os 20 testes gênero × grupo de nota rejeitam a independência, mas os efeitos são pequenos:
 #   - o maior V de Cramér é o de Drama (0,119);
 #   - Comedy, Crime e Horror ficam entre 0,06 e 0,08;
@@ -1228,8 +1230,9 @@ plt.show()
 # | Achado da exploração (Seção 1) | Consequência para o pré-processamento (Seção 2) |
 # |---|---|
 # | A nota ocupa os 10 valores válidos e é assimétrica à esquerda; 0,5 e 1,0 ficam abaixo do whisker | conferir domínio e nulos; manter notas baixas como outliers legítimos |
-# | 5.062 filmes com `(no genres listed)`, parte deles com avaliações (1.6-c) | rótulo `Unknown`; imputar o gênero dos que têm avaliações suficientes (2.2-b) |
-# | `imdbId`/`tmdbId` são identificadores externos | atributos irrelevantes para P1/P2; ausências de `tmdbId` não exigem tratamento |
+# | 5.062 filmes com `(no genres listed)`, parte deles com avaliações (1.6-c) | rótulo `Unknown`; preencher o gênero pelo IMDb (2.2-b) e validar com o público do filme (kNN, 2.2-c) |
+# | `imdbId`/`tmdbId` são identificadores externos | não entram como atributos de P1/P2; o `imdbId` serve de chave para buscar no IMDb o gênero e o ano que faltam (2.2-b); ausências de `tmdbId` não exigem tratamento |
+# | Filmes sem ano no fim do título (1.8-c) | ano preenchido pelo IMDb (2.2-b) para o perfil revisado; a análise por década da Seção 1 continua só com o ano do título |
 # | Filmes do catálogo sem avaliação | ficam fora de P1/P2, pois não têm comportamento de avaliação |
 # | Volume muito assimétrico por usuário e por filme | usar proporções com denominadores explícitos e suporte mínimo; contagem bruta só descreve grupos |
 # | `nota_media` × `prop_positivas` muito associadas (Pearson 0,922; Spearman 0,946) | analisar redundância na seleção de características (3.2) |

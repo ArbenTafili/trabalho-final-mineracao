@@ -45,6 +45,11 @@ def test_material_nao_cita_slides_nem_aulas(notebook):
     assert not re.search(r"\baulas?\b", texto)
 
 
+def test_nenhuma_leitura_pendente(notebook):
+    pendentes = [c.source[:60] for c in notebook.cells if "LEITURA_PENDENTE" in c.source]
+    assert not pendentes, pendentes
+
+
 def test_notebook_termina_na_secao_3(notebook):
     titulos = [c.source.splitlines()[0] for c in notebook.cells if c.cell_type == "markdown" and c.source.startswith("## ")]
     assert not any(re.match(r"## [4-9]\.", t) for t in titulos), titulos
@@ -58,4 +63,5 @@ def test_executa_inteiro_com_dados_sinteticos(tmp_path_factory):
     executar(dados, saida)  # termina com SystemExit se alguma célula falhar
     valores = controles(textos_por_celula(saida))
     assert valores["nota idêntica após tratamento"] == "True"
-    assert valores["filmes com gênero imputado"] != "—"
+    assert valores["filmes com gênero do IMDb"] != "—"
+    assert valores["mínimo de avaliadores (kNN)"] != "—"

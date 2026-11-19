@@ -58,6 +58,13 @@ def executar(dados, saida, timeout=None, nucleos=None):
         sys.exit(f"ratings.csv não encontrado em {dados}")
     nb, _, _ = montar()
     os.environ["MOVIELENS_DIR"] = str(dados)
+    # Recorte do IMDb: ao lado dos dados (sintéticos) ou em dados/imdb (reais).
+    for recorte in (dados / "imdb_recorte_movielens.tsv.gz", dados.parent / "imdb" / "imdb_recorte_movielens.tsv.gz"):
+        if recorte.is_file():
+            os.environ["IMDB_RECORTE"] = str(recorte)
+            break
+    else:
+        sys.exit("Recorte do IMDb não encontrado; rode scripts/baixar_dados.py --imdb e scripts/recortar_imdb.py")
     if nucleos:  # ex.: 2, como no Colab gratuito
         os.environ["PYSPARK_SUBMIT_ARGS"] = f"--master local[{nucleos}] pyspark-shell"
     os.environ.setdefault("PYSPARK_PYTHON", sys.executable)

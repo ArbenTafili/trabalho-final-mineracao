@@ -132,13 +132,48 @@ def gerar(destino, n_usuarios, n_filmes, semente=1):
     tmdb[:5] = np.nan
     links = pd.DataFrame({"movieId": movies.movieId, "imdbId": imdb, "tmdbId": tmdb})
 
+    imdb = recorte_imdb(movies, links, rng)
+
     destino = Path(destino)
     destino.mkdir(parents=True, exist_ok=True)
     movies.to_csv(destino / "movies.csv", index=False)
     ratings.to_csv(destino / "ratings.csv", index=False, float_format="%.1f")
     tags.to_csv(destino / "tags.csv", index=False, float_format="%.0f")
     links.to_csv(destino / "links.csv", index=False, float_format="%.0f")
-    return {"filmes": len(movies), "avaliacoes": len(ratings), "usuarios": ratings.userId.nunique(), "tags": len(tags)}
+    imdb.to_csv(destino / "imdb_recorte_movielens.tsv.gz", sep="\t", index=False, na_rep="\\N",
+                compression={"method": "gzip", "mtime": 0})
+    return {"filmes": len(movies), "avaliacoes": len(ratings), "usuarios": ratings.userId.nunique(), "tags": len(tags),
+            "imdb": len(imdb)}
+
+
+def recorte_imdb(movies, links, rng):
+    """Recorte do IMDb com os casos de borda: não encontrados, só 'Short', TV, anos divergentes, Family no lugar de Children."""
+    linhas = []
+    for (_, filme), imdb_id in zip(movies.iterrows(), links["imdbId"]):
+        if rng.random() < 0.005:  # código que o IMDb não tem mais
+            continue
+        titulo = filme["title"].strip()
+        ano = titulo[-5:-1] if titulo.endswith(")") and titulo[-5:-1].isdigit() else str(int(rng.integers(2015, 2020)))
+        if rng.random() < 0.02:
+            ano = str(int(ano) + (1 if rng.random() < 0.8 else 6))
+        if filme["genres"] == "(no genres listed)":
+            sorteio = rng.random()
+            if sorteio < 0.10:
+                generos = "Short"
+            elif sorteio < 0.15:
+                generos = None
+            else:
+                generos = ",".join(sorted(rng.choice([g for g in GENEROS if g != "IMAX"], size=int(rng.integers(1, 3)),
+                                                     replace=False)))
+        else:
+            gs = [("Family" if g == "Children" and rng.random() < 0.6 else g) for g in filme["genres"].split("|") if g != "IMAX"]
+            if rng.random() < 0.1:
+                gs.append("Biography")
+            generos = ",".join(sorted(gs)[:3]) or None
+        tipo = "short" if generos == "Short" else ("tvEpisode" if rng.random() < 0.02 else "movie")
+        linhas.append({"tconst": f"tt{int(imdb_id):07d}", "titleType": tipo, "primaryTitle": titulo.split(" (")[0],
+                       "startYear": ano, "genres": generos})
+    return pd.DataFrame(linhas)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@
 # |---|---|
 # | 0. Problema e tarefa | P1 = agrupamento de usuários; P2 = associação; P2 depende de P1; não há classe/meta |
 # | 1. Seleção | fontes, grão, instância × atributos, tipos e domínios; exploração univariada com histogramas de todos os atributos (média e DP marcados), consultas por gênero, por objeto e com filtro, e exploração multivariada com atributos em escala [0, 1] **sobre os dados-alvo, antes de qualquer tratamento** |
-# | 2. Pré-processamento | qualidade (completude, unicidade, validade, integridade), limpeza, imputação do gênero dos filmes sem gênero, integração das tabelas, amostragem, valores ausentes e distribuições depois do tratamento |
+# | 2. Pré-processamento | qualidade (completude, unicidade, validade, integridade), limpeza, gênero e ano que faltam preenchidos pelo IMDb (com o gênero também previsto pelo público, por kNN, como validação), integração das tabelas, amostragem, valores ausentes e distribuições depois do tratamento |
 # | 3. Transformação | perfil por usuário em proporções, seleção de características, normalização, PCA, concentração de distâncias, dimensionalidade intrínseca, visualização, valores atípicos, tendência de agrupamento, vetor revisado com atributos derivados e solução indexada |
 #
 # Esta versão vai até a etapa 3 (Transformação). A mineração (P1 e P2) e a interpretação ficam para a versão seguinte.
