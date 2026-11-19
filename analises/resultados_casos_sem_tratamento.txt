@@ -1,0 +1,97 @@
+=== A. Filmes que continuam sem gênero depois do IMDb ===
+240 filmes, 1,406 avaliações (0.0056% do total)
+                                         filmes  avaliacoes
+motivo                                                     
+IMDb sem gênero                              16          31
+código ausente do IMDb                       15         225
+só gêneros que não existem no MovieLens     209        1150
+Gêneros do IMDb dos que só têm gêneros fora do MovieLens: {'Short': 145, 'Music': 26, 'News,Short': 7, 'Short,Sport': 6, 'History': 5, 'Music,Short': 5, 'Biography': 4, 'Reality-TV': 3}
+
+Por número de avaliações (o kNN da 2.2-c passa nos dois testes a partir de 5 avaliadores; na validação interna, a partir de 3):
+              filmes  avaliacoes
+n_avaliacoes                    
+0                  7           0
+1–2              131         181
+3–4               47         160
+5–9               36         245
+10+               19         820
+
+Se os 233 com avaliação fossem excluídos: usuários afetados: 823 de 162,541; maior fração das avaliações de um usuário: 5.0%; usuários que perderiam todas as avaliações: 0; menor número de avaliações que sobra a um usuário afetado: 19
+Tratáveis pelo kNN (5 ou mais avaliadores): 55 filmes, 1,065 avaliações; sem tratamento (1 a 4): 178 filmes, 341 avaliações
+Se só os de 1 a 4 avaliadores fossem excluídos: usuários afetados: 124 de 162,541; maior fração das avaliações de um usuário: 2.6%; usuários que perderiam todas as avaliações: 0; menor número de avaliações que sobra a um usuário afetado: 38
+Os mais avaliados:
+                                       title  n_avaliacoes titleType   genres_imdb                                  motivo
+                                Black Mirror           456     short         Short só gêneros que não existem no MovieLens
+               Beastie Boys: Sabotage (1994)            79       NaN           NaN                  código ausente do IMDb
+            David Lynch: The Art Life (2016)            48       NaN           NaN                  código ausente do IMDb
+         Marco Polo: One Hundred Eyes (2015)            38       NaN           NaN                  código ausente do IMDb
+                Michael Jackson - Bad (1987)            26       NaN           NaN                  código ausente do IMDb
+                                    The Code            16     short         Short só gêneros que não existem no MovieLens
+                 Kustom Kar Kommandos (1965)            15     short   Music,Short só gêneros que não existem no MovieLens
+                       Recep İvedik 3 (2010)            15     movie           NaN                         IMDb sem gênero
+                          Puce Moment (1949)            14     short         Short só gêneros que não existem no MovieLens
+                             The 3 Rs (2011)            13     short         Short só gêneros que não existem no MovieLens
+The Execution of Mary, Queen of Scots (1895)            13     short History,Short só gêneros que não existem no MovieLens
+The Work of Director Chris Cunningham (2003)            12     video         Music só gêneros que não existem no MovieLens
+
+=== B. Filmes que continuam sem ano depois do IMDb ===
+ movieId                         title             genres  n_avaliacoes titleType
+  177265                     Checkmate (no genres listed)             1       NaN
+  190961                      Poor Boy              Drama             0     movie
+  205551 The Fellowship of the Farmers (no genres listed)             1       NaN
+3 filmes, 2 avaliações
+
+=== C. Títulos repetidos com o mesmo código TMDb (D3) ===
+8 pares, 16 filmes, 6,671 avaliações
+
+Berlin Calling (2008) (TMDb 30508; usuários que avaliaram as duas cópias: 1)
+ movieId       genres  n_avaliacoes    tconst titleType   primaryTitle startYear runtimeMinutes        genres_imdb
+   66511 Comedy|Drama            81 tt1213019       NaN            NaN       NaN            NaN                NaN
+  191775 Comedy|Drama            13 tt0211946     movie Berlin Calling      2008            109 Comedy,Drama,Music
+
+Blackout (2007) (TMDb 141971; usuários que avaliaram as duas cópias: 0)
+ movieId          genres  n_avaliacoes    tconst titleType primaryTitle startYear runtimeMinutes             genres_imdb
+   66140 Horror|Thriller            35 tt0844666     movie     Blackout      2008             85 Horror,Mystery,Thriller
+   85070           Drama             5 tt0822791     movie     Blackout      2007             95                   Drama
+
+Clockstoppers (2002) (TMDb 15028; usuários que avaliaram as duas cópias: 11)
+ movieId                             genres  n_avaliacoes    tconst titleType  primaryTitle startYear runtimeMinutes             genres_imdb
+    5264   Action|Adventure|Sci-Fi|Thriller           750 tt0250305       NaN           NaN       NaN            NaN                     NaN
+  144426 Adventure|Children|Sci-Fi|Thriller            36 tt0157472     movie Clockstoppers      2002             94 Action,Adventure,Comedy
+
+Confessions of a Dangerous Mind (2002) (TMDb 4912; usuários que avaliaram as duas cópias: 135)
+ movieId                              genres  n_avaliacoes    tconst titleType                    primaryTitle startYear runtimeMinutes            genres_imdb
+    6003         Comedy|Crime|Drama|Thriller          3159 tt0290538       NaN                             NaN       NaN            NaN                    NaN
+  144606 Comedy|Crime|Drama|Romance|Thriller           239 tt0270288     movie Confessions of a Dangerous Mind      2002            113 Biography,Comedy,Crime
+
+Enron: The Smartest Guys in the Room (2005) (TMDb 13020; usuários que avaliaram as duas cópias: 4)
+ movieId      genres  n_avaliacoes    tconst titleType                         primaryTitle startYear runtimeMinutes                   genres_imdb
+   33154 Documentary          1471 tt0413845 tvEpisode Enron: The Smartest Guys in the Room      2005            109                   Documentary
+  202599 Documentary            12 tt1016268     movie Enron: The Smartest Guys in the Room      2005            110 Biography,Documentary,History
+
+Lagaan: Once Upon a Time in India (2001) (TMDb 19666; usuários que avaliaram as duas cópias: 17)
+ movieId                       genres  n_avaliacoes    tconst titleType                      primaryTitle startYear runtimeMinutes         genres_imdb
+    6776 Comedy|Drama|Musical|Romance           788 tt0282674       NaN                               NaN       NaN            NaN                 NaN
+  181751      Adventure|Drama|Romance            51 tt0169102     movie Lagaan: Once Upon a Time in India      2001            224 Drama,Musical,Sport
+
+Seven Years Bad Luck (1921) (TMDb 97995; usuários que avaliaram as duas cópias: 1)
+ movieId genres  n_avaliacoes    tconst titleType         primaryTitle startYear runtimeMinutes genres_imdb
+   70155 Comedy             9 tt0160835       NaN                  NaN       NaN            NaN         NaN
+  163246 Comedy             2 tt0127834     movie Seven Years Bad Luck      1921             62      Comedy
+
+The Lonely Island Presents: The Unauthorized Bash Brothers Experience (2019) (TMDb 604196; usuários que avaliaram as duas cópias: 2)
+ movieId genres  n_avaliacoes     tconst titleType                              primaryTitle startYear runtimeMinutes        genres_imdb
+  203449 Comedy            15 tt10377024       NaN                                       NaN       NaN            NaN                NaN
+  206117 Comedy             5 tt10376068     short The Unauthorized Bash Brothers Experience      2019             30 Comedy,Music,Short
+
+Cópias menos avaliadas dos 8 pares: 8 filmes, 363 avaliações; usuários afetados: 332 de 162,541; maior fração das avaliações de um usuário: 2.6%; usuários que perderiam todas as avaliações: 0; menor número de avaliações que sobra a um usuário afetado: 38
+As duas cópias dos 8 pares: 16 filmes, 6,671 avaliações; usuários afetados: 5,725 de 162,541; maior fração das avaliações de um usuário: 5.0%; usuários que perderiam todas as avaliações: 0; menor número de avaliações que sobra a um usuário afetado: 19
+
+=== D. O kNN da 2.2-c serve para os filmes sem gênero com 5 ou mais avaliadores? ===
+Tipo no IMDb dos filmes de A com 5 ou mais avaliadores: {'short': 46, 'código ausente': 6, 'tvSpecial': 1, 'movie': 1, 'video': 1}
+  curtas do IMDb, 5–9 avaliadores: 524 filmes; kNN 41.2%; chutar Drama 13.2%; chutar o gênero mais comum (Animation) 53.1%
+  curtas do IMDb, 10–49 avaliadores: 448 filmes; kNN 56.2%; chutar Drama 16.1%; chutar o gênero mais comum (Animation) 48.4%
+  curtas do IMDb, 5+ avaliadores: 1,100 filmes; kNN 51.0%; chutar Drama 14.8%; chutar o gênero mais comum (Animation) 52.7%
+  IMDb só com gêneros que não existem no MovieLens, 5–9 avaliadores: 23 filmes; kNN 34.8%; chutar Drama 21.7%; chutar o gênero mais comum (Documentary) 52.2%
+  IMDb só com gêneros que não existem no MovieLens, 10–49 avaliadores: 12 filmes; kNN 58.3%; chutar Drama 50.0%; chutar o gênero mais comum (Documentary) 50.0%
+  IMDb só com gêneros que não existem no MovieLens, 5+ avaliadores: 37 filmes; kNN 45.9%; chutar Drama 32.4%; chutar o gênero mais comum (Documentary) 51.4%

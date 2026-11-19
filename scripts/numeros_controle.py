@@ -25,10 +25,15 @@ CONTROLES = [
     ("filmes que continuam sem gênero", r"continuam sem gênero: ([\d,]+)"),
     ("acerto kNN, filmes com 10+ avaliadores (%)", r"Filmes com 10 ou mais avaliadores: kNN ([\d.]+)%"),
     ("mínimo de avaliadores (kNN)", r"Mínimo de avaliadores pelo critério .*?: (\w+)"),
-    ("nota idêntica após tratamento", r"Distribuição da nota idêntica antes e depois do tratamento: (\w+)"),
+    ("cópias fundidas (títulos repetidos)", r"Cópias fundidas: (\d+)"),
+    ("avaliações repetidas removidas na fusão", r"avaliações repetidas removidas: ([\d,]+)"),
+    ("filmes excluídos (sem gênero)", r"Filmes excluídos \(sem gênero\): ([\d,]+)"),
+    ("avaliações excluídas (sem gênero)", r"Avaliações excluídas: ([\d,]+)"),
+    ("filmes no catálogo depois da limpeza", r"avaliações, ([\d,]+) filmes no catálogo"),
+    ("diferença máxima da nota após tratamento (p.p.)", r"maior diferença de proporção = ([\d.]+) p\.p\."),
     ("variância retida PCA base (%)", r"Matriz candidata no espaço PCA: \(\d+, \d+\); variância retida = ([\d.]+)%"),
     ("usuários atípicos", r"Atípicos \(b e c ao mesmo tempo\): ([\d,]+) usuários"),
-    ("Hopkins PCA (percentis 1–99)", r"PCA \(7\)\s+todos\s+percentis 1–99\s+\d+\s+([\d.]+)"),
+    ("Hopkins PCA (percentis 1–99)", r"PCA \(\d+\)\s+todos\s+percentis 1–99\s+\d+\s+([\d.]+)"),
     ("variância retida PCA revisado (%)", r"PCA do vetor revisado: d′ = \d+ \(Kaiser-Guttman, ([\d.]+)%"),
 ]
 

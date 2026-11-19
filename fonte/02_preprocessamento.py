@@ -69,10 +69,11 @@ print("Avaliações sem filme correspondente:", avaliacoes_orfas)
 #
 # | Ocorrência | Classificação | Decisão |
 # |---|---|---|
-# | `ratings`: 0 nulos, 0 duplicatas e 0 notas inválidas | qualidade verificada | nenhuma avaliação removida; a regra de deduplicação (mais recente pelo `timestamp`) fica no código para reprodutibilidade |
-# | 5.062 filmes `(no genres listed)` | valor ausente em atributo usado no perfil | rótulo `Unknown`; gênero preenchido pelo IMDb, ligado pela tabela `links` (2.2-b); os que o IMDb não resolve continuam `Unknown` |
+# | `ratings`: 0 nulos, 0 duplicatas e 0 notas inválidas | qualidade verificada | nenhuma avaliação removida por qualidade; a regra de deduplicação (mais recente pelo `timestamp`) fica no código para reprodutibilidade |
+# | títulos repetidos com o mesmo código TMDb | redundância: o mesmo filme cadastrado duas vezes | fundir as cópias pela regra automática (2.2-a) |
+# | 5.062 filmes `(no genres listed)` | valor ausente em atributo usado no perfil | rótulo `Unknown`; gênero preenchido pelo IMDb, ligado pela tabela `links` (2.2-b); os que o IMDb não resolve não têm tratamento automático e são excluídos, se a exclusão não pesar (2.2-d) |
 # | 412 filmes sem ano no título | valor ausente em atributo usado no perfil revisado (3.8) | ano preenchido pelo IMDb (2.2-b) |
-# | 107 links sem `tmdbId` | valor ausente em atributo não usado | ignorar: dos links, só o `imdbId` é usado, como chave para o IMDb (2.2-b) |
+# | 107 links sem `tmdbId` | valor ausente em atributo pouco usado | ignorar: o `imdbId` é a chave para o IMDb (2.2-b), e o `tmdbId` só entra na regra dos títulos repetidos (2.2-a), em que um filme sem ele fica fora da fusão |
 # | Tags | fora dos dados-alvo | não tratadas nesta fase |
 # | Notas 0,5 e 1,0 fora do whisker | outlier legítimo | manter |
 # | Pares usuário–filme não avaliados | não são valores ausentes | não imputar; preencher criaria avaliações artificiais |
@@ -136,6 +137,84 @@ for nome, df in clean_datasets.items():
 print("Views limpas criadas:", ", ".join(clean_datasets))
 
 # %% [markdown]
+# #### Títulos repetidos: o mesmo filme cadastrado duas vezes
+#
+# Alguns títulos (nome e ano) aparecem mais de uma vez na tabela `movies`. Quase sempre são filmes diferentes com o mesmo nome, com códigos IMDb e TMDb diferentes. Quando as cópias têm o mesmo código TMDb, podem ser o mesmo filme cadastrado duas vezes. A regra, aplicada pelo código a todos os títulos repetidos:
+#
+# - **mesmo filme:** mesmo título (com o ano), mesmo código TMDb e pelo menos um gênero do MovieLens em comum. As cópias viram uma só: fica a mais avaliada, com os gêneros dela, e as avaliações das outras passam para ela. Quem avaliou mais de uma cópia fica com a avaliação mais recente;
+# - **filmes diferentes:** sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual;
+# - **chave do IMDb:** se o código IMDb da cópia que fica não existe mais no IMDb, ela herda o código da cópia fundida (2.2-b). O IMDb apaga um dos códigos quando descobre um cadastro em dobro, então um código que sumiu é mais uma evidência de duplicata.
+#
+# A seção 1 descreve os dados antes desta fusão. As tags estão fora dos dados-alvo; a tabela de correspondência `mapa_fusao` (movieId antigo → novo) fica pronta para elas.
+
+# %%
+# [2.2-a] Títulos repetidos: fusão das cópias do mesmo filme
+avaliacoes_filme = ratings_clean.groupBy("movieId").agg(F.count("*").alias("avaliacoes"))
+catalogo = (movies_clean.select("movieId", F.trim("title").alias("titulo"), "genres")
+            .join(links_clean.select("movieId", "imdbId", "tmdbId"), "movieId", "left")
+            .join(avaliacoes_filme, "movieId", "left").fillna({"avaliacoes": 0})
+            .orderBy("movieId").toPandas())
+repetidos = catalogo[catalogo.duplicated("titulo", keep=False)].sort_values(["titulo", "movieId"])
+mesmo_tmdb = repetidos.groupby("titulo")["tmdbId"].agg(lambda s: s.notna().all() and s.nunique() == 1)
+print(f"Títulos repetidos (nome e ano): {repetidos['titulo'].nunique():,} títulos, {len(repetidos):,} filmes; "
+      f"com o mesmo código TMDb em todas as cópias: {int(mesmo_tmdb.sum())}")
+
+generos_do = lambda s: set() if s == "Unknown" else set(s.split("|"))
+linhas_fusao = []
+for titulo in mesmo_tmdb[mesmo_tmdb].index:
+    copias = repetidos[repetidos["titulo"] == titulo].sort_values(["avaliacoes", "movieId"], ascending=[False, True])
+    fica = copias.iloc[0]
+    for _, outra in copias.iloc[1:].iterrows():
+        comum = generos_do(fica["genres"]) & generos_do(outra["genres"])
+        linhas_fusao.append({"título": titulo, "fica": int(fica["movieId"]), "sai": int(outra["movieId"]),
+                             "avaliações (fica)": int(fica["avaliacoes"]), "avaliações (sai)": int(outra["avaliacoes"]),
+                             "gêneros (fica)": fica["genres"], "gêneros (sai)": outra["genres"],
+                             "gêneros em comum": "|".join(sorted(comum)) or "—",
+                             "imdb_sai": int(outra["imdbId"]), "decisão": "fundir" if comum else "filmes diferentes"})
+pares_repetidos = pd.DataFrame(linhas_fusao, columns=["título", "fica", "sai", "avaliações (fica)", "avaliações (sai)",
+                                                      "gêneros (fica)", "gêneros (sai)", "gêneros em comum", "imdb_sai", "decisão"])
+print(pares_repetidos.drop(columns="imdb_sai").to_string(index=False))
+fundir = pares_repetidos[pares_repetidos["decisão"] == "fundir"]
+mapa_fusao = fundir[["sai", "fica"]].rename(columns={"sai": "movieId_antigo", "fica": "movieId_novo"}).reset_index(drop=True)
+codigo_imdb_alternativo = dict(zip(fundir["fica"], fundir["imdb_sai"]))  # usado na 2.2-b
+
+# Avaliações: a cópia que sai passa para a que fica; quem avaliou as duas fica com a avaliação mais recente.
+avaliacoes_antes_fusao = ratings_clean.count()
+duplicadas_fusao = 0
+if len(mapa_fusao):
+    de_para = F.create_map(*[F.lit(int(x)) for par in mapa_fusao.itertuples(index=False) for x in par])
+    ficam = mapa_fusao["movieId_novo"].astype(int).tolist()
+    remapeadas = (ratings_clean.withColumn("movieId_original", F.col("movieId"))
+                  .withColumn("movieId", F.coalesce(de_para[F.col("movieId")], F.col("movieId"))))
+    ordem_copia = Window.partitionBy("userId", "movieId").orderBy(F.col("timestamp").desc(), F.col("movieId_original").asc())
+    envolvidas = (remapeadas.filter(F.col("movieId").isin(ficam))
+                  .withColumn("_ordem", F.row_number().over(ordem_copia)).filter(F.col("_ordem") == 1).drop("_ordem"))
+    fundidas = (remapeadas.filter(~F.col("movieId").isin(ficam)).unionByName(envolvidas)
+                .drop("movieId_original").cache())
+    duplicadas_fusao = avaliacoes_antes_fusao - fundidas.count()
+    ratings_clean.unpersist()
+    ratings_clean = fundidas
+    movies_clean = movies_clean.filter(~F.col("movieId").isin(mapa_fusao["movieId_antigo"].astype(int).tolist()))
+    links_clean = links_clean.filter(~F.col("movieId").isin(mapa_fusao["movieId_antigo"].astype(int).tolist()))
+    for nome, df in [("ratings_clean", ratings_clean), ("movies_clean", movies_clean), ("links_clean", links_clean)]:
+        df.createOrReplaceTempView(nome)
+print(f"\nCópias fundidas: {len(mapa_fusao)}; avaliações repetidas removidas: {duplicadas_fusao:,} "
+      f"(usuários que avaliaram mais de uma cópia); avaliações: {avaliacoes_antes_fusao:,} → {avaliacoes_antes_fusao - duplicadas_fusao:,}")
+
+# %% [markdown]
+# **Leitura dos resultados.**
+#
+# - **Títulos repetidos:** 98 títulos (nome e ano) aparecem duas vezes, em 196 filmes. Em 90 deles, as cópias têm códigos TMDb diferentes ou ausentes: são filmes diferentes com o mesmo nome e ficam separados.
+# - **Mesmo código TMDb:** 8 pares. Em 7, as cópias têm gêneros em comum e foram fundidas: Berlin Calling, Clockstoppers, Confessions of a Dangerous Mind, Enron, Lagaan, Seven Years Bad Luck e The Unauthorized Bash Brothers Experience. Blackout (2007) ficou separado: uma cópia é Horror|Thriller e a outra, Drama. No IMDb, as duas cópias de Blackout são filmes de anos e durações diferentes (`analises/casos_sem_tratamento.py`).
+# - **Gêneros:** o filme fundido fica com os gêneros da cópia mais avaliada. A outra cópia tinha gêneros parecidos; por exemplo, em Lagaan fica Comedy|Drama|Musical|Romance e sai Adventure|Drama|Romance.
+# - **Avaliações:** 171 avaliações eram de usuários que avaliaram as duas cópias do mesmo filme; ficou a mais recente. As avaliações passam de 25.000.095 para 24.999.924.
+# - **Evidência do IMDb:** em 6 dos 7 pares fundidos, o código IMDb da cópia mais avaliada não existe mais no IMDb (2.2-b), sinal de que o próprio IMDb tratou o cadastro em dobro.
+#
+# **Limitação:** a regra depende do código TMDb e dos gêneros. Duas cópias do mesmo filme sem gênero em comum ficariam separadas; em Blackout, o único caso assim, o IMDb confirma que são filmes diferentes.
+#
+# **Consequência:** cada filme passa a ter um registro só. A fusão muda 7 filmes e 171 avaliações e vem antes da integração com o IMDb.
+
+# %% [markdown]
 # #### Gênero e ano que faltam: integração com o IMDb
 #
 # O gênero entra no perfil do usuário, e o ano entra no perfil revisado (3.8). No MovieLens, 5.062 filmes não têm gênero e 412 não têm ano no título. Os dois valores existem na realidade, só não foram registrados.
@@ -168,6 +247,17 @@ if not IMDB_RECORTE.is_file():
         urllib.request.urlretrieve("https://datasets.imdbws.com/title.basics.tsv.gz", IMDB_RECORTE)
 imdb_pd = pd.read_csv(IMDB_RECORTE, sep="\t", usecols=colunas_imdb, dtype=str, na_values="\\N",
                       keep_default_na=False, quoting=3)
+# Fusão (2.2-a): se o código IMDb da cópia que ficou não existe no IMDb, ela herda o código da cópia fundida.
+codigos_imdb = set(imdb_pd["tconst"])
+herdados = []
+for fica, imdb_sai in codigo_imdb_alternativo.items():
+    linha = links_pd["movieId"] == fica
+    tconst_sai = "tt" + str(int(imdb_sai)).zfill(7)
+    if links_pd.loc[linha, "tconst"].iloc[0] not in codigos_imdb and tconst_sai in codigos_imdb:
+        links_pd.loc[linha, "imdbId"] = int(imdb_sai)
+        links_pd.loc[linha, "tconst"] = tconst_sai
+        herdados.append(fica)
+print(f"Códigos IMDb herdados na fusão de títulos repetidos (2.2-a): {len(herdados)} de {len(codigo_imdb_alternativo)}")
 imdb_pd = imdb_pd[imdb_pd["tconst"].isin(set(links_pd["tconst"]))]
 print(f"IMDb: {IMDB_RECORTE.name} (MD5 {hashlib.md5(IMDB_RECORTE.read_bytes()).hexdigest()}); "
       f"{len(imdb_pd):,} títulos ligados ao MovieLens")
@@ -303,22 +393,22 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Junção:** a ligação pela tabela `links` é 1:1. O IMDb encontra 62.294 dos 62.423 filmes; os 129 não encontrados (17.085 avaliações) têm códigos ausentes do arquivo do IMDb, e só 15 deles estão entre os filmes sem gênero.
-# - **Conversão de gêneros:** nos 57.100 filmes com gênero nas duas fontes, 97,7% têm pelo menos um gênero em comum (conjuntos idênticos: 46,9%; Jaccard médio 0,719).
+# - **Junção:** a ligação pela tabela `links` é 1:1. Depois da fusão da 2.2-a, o IMDb encontra 62.293 dos 62.416 filmes; os 123 não encontrados (12.283 avaliações) têm códigos ausentes do arquivo do IMDb, e só 15 deles estão entre os filmes sem gênero. Em 6 das 7 cópias que ficaram na fusão, o código IMDb não existia mais e foi herdado da cópia fundida.
+# - **Conversão de gêneros:** nos 57.099 filmes com gênero nas duas fontes, 97,7% têm pelo menos um gênero em comum (conjuntos idênticos: 46,9%; Jaccard médio 0,719).
 #   - Concordância alta nos dois sentidos: Animation e Documentary (acima de 96%), Horror, Comedy e Drama (de 79% a 94%).
 #   - Concordância baixa: Musical (48% e 43%), Mystery (67% e 48%) e Film-Noir (73% e 45%). As duas fontes não usam esses rótulos do mesmo jeito.
 #   - `Music` não vira Musical: só 15,4% desses filmes são Musical no MovieLens.
-# - **Ano:** nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0%. Os 644 com diferença maior ficam como indicador da qualidade da chave; nada é corrigido.
-# - **Gênero preenchido:** 4.822 dos 5.062 filmes sem gênero recebem o gênero do IMDb (25.221 avaliações, 0,10% do total). Continuam sem gênero 240 filmes (1.406 avaliações, 0,006%), dos quais só 55 têm 5 ou mais avaliações.
+# - **Ano:** nos 61.879 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0%. Os 644 com diferença maior ficam como indicador da qualidade da chave; nada é corrigido.
+# - **Gênero preenchido:** 4.822 dos 5.062 filmes sem gênero recebem o gênero do IMDb (25.221 avaliações, 0,10% do total). Continuam sem gênero 240 filmes (1.406 avaliações, 0,006%), dos quais só 55 têm 5 ou mais avaliações; eles são excluídos em 2.2-d.
 # - **Ano preenchido:** o IMDb dá o ano de 409 dos 412 filmes sem ano no título (11.747 avaliações); 3 filmes, com 2 avaliações, continuam sem ano.
 # - **Tipos de título:** dos filmes sem gênero no MovieLens, 3.684 são longas no IMDb, 628 são curtas e quase todo o resto são títulos de TV. Na amostra dos 149 títulos de TV preenchidos, título e ano batem com o catálogo (por exemplo, Cosmos, The OA, 13 Reasons Why e Death Note são séries).
 # - **Por origem:** os filmes preenchidos têm 1,78 gênero por filme, contra 1,87 dos que já tinham gênero. Têm menos Thriller (7,4% contra 15,1%), mais Drama (52,5% contra 44,6%) e mais Musical (3,1% contra 1,8%). O IMDb usa menos Thriller e lista no máximo três gêneros, como a concordância já indicava.
-# - **Conferência da chave:** um código errado na tabela `links` traria o gênero de outro título. A chave foi conferida por código em todos os filmes, fora do notebook (`analises/chave_imdb.py`, resultados em `analises/resultados_chave_imdb.txt`). Nos 57.100 filmes com gênero nas duas fontes, a concordância é de 97,7% com a chave verdadeira e de 40,0% com uma chave sorteada, e continua perto de 97% quando o título difere (traduções, como Hachi-ko e The Story of Hachikō) ou quando o título é curta, série ou episódio. Nenhum filme é excluído.
+# - **Conferência da chave:** um código errado na tabela `links` traria o gênero de outro título. A chave foi conferida por código em todos os filmes, fora do notebook (`analises/chave_imdb.py`, resultados em `analises/resultados_chave_imdb.txt`). Nos 57.100 filmes com gênero nas duas fontes (medição feita antes da fusão da 2.2-a), a concordância é de 97,7% com a chave verdadeira e de 40,0% com uma chave sorteada, e continua perto de 97% quando o título difere (traduções, como Hachi-ko e The Story of Hachikō) ou quando o título é curta, série ou episódio. Nenhum filme é excluído.
 # - **Margem de erro:** supondo que uma chave errada concorde como uma chave sorteada, e tomando como controle os filmes que entraram no catálogo na mesma época dos preenchidos (movieId acima de 131.262), cerca de 5,0% dos gêneros preenchidos (240 filmes; 1.359 avaliações, 0,0054% do total) e cerca de 56 dos 409 anos preenchidos (até 94) podem vir de uma chave errada. No usuário mais exposto, os filmes preenchidos são 10,7% das avaliações, o que dá cerca de 0,6 ponto percentual com gênero possivelmente errado.
 #
 # **Limitação:** a concordância mede o quanto as duas fontes rotulam do mesmo jeito, não qual delas está certa. O IMDb atualiza seus gêneros com o tempo; por isso o recorte usado fica identificado pelo MD5. A conferência automática não detecta um homônimo sem ano: o código de Black Mirror aponta para um curta de 2011 com o mesmo nome, e não para a série (esse filme não recebeu gênero, porque o único gênero do curta no IMDb é Short).
 #
-# **Consequência:** `Unknown` passa de 26.627 para 1.406 avaliações. As colunas `origem_genero` e `origem_ano` permitem executar P1 com e sem os valores preenchidos. Num perfil, um filme preenchido entra como qualquer outro: no vetor base (3.1), cada avaliação conta uma vez em cada gênero do filme; no vetor revisado (3.8), o peso de cada avaliação é dividido entre os gêneros do filme.
+# **Consequência:** o IMDb reduz `Unknown` de 26.627 para 1.406 avaliações; esses 240 filmes não têm tratamento automático e são excluídos em 2.2-d, e `Unknown` deixa de existir. As colunas `origem_genero` e `origem_ano` permitem executar P1 com e sem os valores preenchidos. Num perfil, um filme preenchido entra como qualquer outro: no vetor base (3.1), cada avaliação conta uma vez em cada gênero do filme; no vetor revisado (3.8), o peso de cada avaliação é dividido entre os gêneros do filme.
 
 # %% [markdown]
 # #### O gênero previsto pelo público: kNN
@@ -497,17 +587,85 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Validação interna:** nos 24.010 filmes com gênero e pelo menos 10 avaliadores, o kNN acerta 83,4%, contra 47,3% de chutar Drama. O Naive Bayes acerta 69,6%; seu erro, de 30,4%, é a taxa de ruído de referência, e o kNN fica bem abaixo dela (erro de 16,7%). Contar os gêneros vistos pelo público quase não ajuda: de 47% a 54% sem peso e de 49% a 62% com peso 1/√N.
-# - **Por faixa de avaliadores:** o acerto do kNN cresce com o público do filme: 38,3% com 1–2 avaliadores, 55,3% com 3–4, 67,7% com 5–9, 77,9% com 10–49 e 87,9% com 50 ou mais. O desvio-padrão entre as 5 partes fica abaixo de 1 ponto.
-#   - Pelo critério de 10 pontos acima do chute, o mínimo calculado é **3 avaliadores** (3–4: 12,3 pontos acima).
-#   - Com 1–2 avaliadores, o kNN fica 4,4 pontos abaixo do chute: o público de um ou dois usuários não diz nada sobre o filme.
+# - **Validação interna:** nos 24.006 filmes com gênero e pelo menos 10 avaliadores, o kNN acerta 83,4%, contra 47,3% de chutar Drama. O Naive Bayes acerta 69,6%; seu erro, de 30,4%, é a taxa de ruído de referência, e o kNN fica bem abaixo dela (erro de 16,6%). Contar os gêneros vistos pelo público quase não ajuda: de 47% a 54% sem peso e de 49% a 62% com peso 1/√N.
+# - **Por faixa de avaliadores:** o acerto do kNN cresce com o público do filme: 38,2% com 1–2 avaliadores, 55,4% com 3–4, 67,8% com 5–9, 78,0% com 10–49 e 87,8% com 50 ou mais. O desvio-padrão entre as 5 partes fica em até 1 ponto.
+#   - Pelo critério de 10 pontos acima do chute, o mínimo calculado é **3 avaliadores** (3–4: 12,4 pontos acima).
+#   - Com 1–2 avaliadores, o kNN fica 4,5 pontos abaixo do chute: o público de um ou dois usuários não diz nada sobre o filme.
 # - **Validação externa:** nos filmes sem gênero, a concordância do kNN com o IMDb segue a mesma ordem: 66,6% com 5–9 avaliadores, 70,9% com 10–49 e 80,6% com 50 ou mais, contra 48,7% a 58,3% do chute. Com 3–4 avaliadores, o kNN fica só 3,3 pontos acima do chute e empata com a contagem 1/√N (55,8%); com 1–2, fica abaixo do chute.
-# - **Interna × externa:** a vantagem do kNN sobre o chute é menor no teste externo (na faixa 5–9, 14,8 pontos contra 24,0 na validação interna). Os filmes sem gênero não são iguais aos que têm gênero, e o gabarito externo é outra fonte, que rotula de outro jeito.
+# - **Interna × externa:** a vantagem do kNN sobre o chute é menor no teste externo (na faixa 5–9, 14,8 pontos contra 24,1 na validação interna). Os filmes sem gênero não são iguais aos que têm gênero, e o gabarito externo é outra fonte, que rotula de outro jeito.
 # - **Exemplo:** St. Giuseppe Moscati: Doctor to the Poor (2007) tem 9 avaliadores e nenhum gênero no MovieLens. Entre os 15 filmes de público mais parecido, 13 têm Drama, e o kNN prevê Drama, que é o gênero do IMDb.
 #
 # **Limitação:** o critério interno aceita a faixa 3–4, mas o teste externo mostra que ali o ganho é pequeno. A faixa 5–9 é a primeira que passa nos dois testes.
 #
-# **Consequência:** o comportamento dos usuários contém a informação de gênero: o kNN recupera o gênero de 83% dos filmes com 10 ou mais avaliadores e concorda com o IMDb nos filmes sem gênero a partir de 5 avaliadores. Como o IMDb já preenche 4.822 dos 5.062 filmes sem gênero e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não é usado para preencher.
+# **Consequência:** o comportamento dos usuários contém a informação de gênero: o kNN recupera o gênero de 83% dos filmes com 10 ou mais avaliadores e concorda com o IMDb nos filmes sem gênero a partir de 5 avaliadores. Como o IMDb já preenche 4.822 dos 5.062 filmes sem gênero e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não é usado para preencher. Esses 55 são quase todos curtas, população em que o kNN não supera o chute (2.2-d).
+
+# %% [markdown]
+# #### O que não tem tratamento: exclusão
+#
+# Depois do IMDb, alguns filmes continuam sem gênero: o IMDb não tem o código, não tem gênero para ele ou só tem gêneros que não existem no MovieLens (sobretudo `Short`). O kNN (2.2-c) também não resolve: os que têm 5 ou mais avaliadores são quase todos curtas, e nos curtas com gênero conhecido o kNN não supera o chute no gênero mais comum entre eles (Animation), como medido fora do notebook (`analises/casos_sem_tratamento.py`). Sem tratamento automático, esses filmes saem dos dados-alvo, desde que a exclusão não pese. O critério de "não pesa" foi fixado depois de ver estes filmes e vale como regra para os próximos casos:
+#
+# - as avaliações excluídas somam no máximo 0,1% do total;
+# - nenhum usuário perde mais de 10% das suas avaliações;
+# - nenhum usuário perde todas as avaliações.
+#
+# Os filmes sem gênero e sem nenhuma avaliação também saem. Eles não entram em perfil nenhum; a razão é de código: sem eles, `Unknown` deixa de existir, em vez de virar um atributo sempre igual a zero.
+
+# %%
+# [2.2-d] Exclusão dos filmes que continuam sem gênero
+LIMITE_TOTAL_PCT, LIMITE_USUARIO_PCT = 0.1, 10.0
+sem_tratamento = filmes_pd[filmes_pd["origem_genero"] == "sem gênero"].copy()
+sem_tratamento["motivo"] = np.select(
+    [sem_tratamento["titleType"].isna(), sem_tratamento["genres_imdb"].isna()],
+    ["código ausente do IMDb", "IMDb sem gênero"], "só gêneros que não existem no MovieLens")
+print(f"Filmes excluídos (sem gênero): {len(sem_tratamento):,}")
+print(sem_tratamento.groupby("motivo").agg(filmes=("movieId", "size"), avaliacoes=("avaliacoes", "sum")).to_string())
+so_fora = sem_tratamento["motivo"] == "só gêneros que não existem no MovieLens"
+print("Gêneros do IMDb mais comuns entre os que só têm gêneros fora do MovieLens:",
+      sem_tratamento.loc[so_fora, "genres_imdb"].value_counts().head(5).to_dict())
+print("Tipo no IMDb dos que têm 5 ou mais avaliações:",
+      sem_tratamento.loc[sem_tratamento["avaliacoes"] >= 5, "titleType"].fillna("código ausente").value_counts().to_dict())
+
+ids_excluidos = spark.createDataFrame(pd.DataFrame({"movieId": sem_tratamento["movieId"].astype("int64")}))
+por_usuario = (ratings_clean.join(F.broadcast(ids_excluidos.withColumn("excluida", F.lit(1))), "movieId", "left")
+               .groupBy("userId").agg(F.count("*").alias("total"), F.sum(F.coalesce("excluida", F.lit(0))).alias("excluidas"))
+               .toPandas())
+avaliacoes_antes_exclusao = int(por_usuario["total"].sum())
+avaliacoes_excluidas = int(por_usuario["excluidas"].sum())
+afetados = por_usuario[por_usuario["excluidas"] > 0]
+pct_total = 100 * avaliacoes_excluidas / avaliacoes_antes_exclusao
+pct_usuario = 100 * (afetados["excluidas"] / afetados["total"]).max() if len(afetados) else 0.0
+perdem_tudo = int((afetados["excluidas"] == afetados["total"]).sum())
+print(f"\nAvaliações excluídas: {avaliacoes_excluidas:,} de {avaliacoes_antes_exclusao:,} ({pct_total:.4f}%; limite {LIMITE_TOTAL_PCT}%)")
+print(f"Usuários afetados: {len(afetados):,} de {len(por_usuario):,}; maior fração das avaliações de um usuário: "
+      f"{pct_usuario:.1f}% (limite {LIMITE_USUARIO_PCT:.0f}%); usuários que perderiam todas: {perdem_tudo}")
+nao_pesa = pct_total <= LIMITE_TOTAL_PCT and pct_usuario <= LIMITE_USUARIO_PCT and perdem_tudo == 0
+print(f"Critério de 'não pesa' atendido: {nao_pesa}")
+assert nao_pesa, "a exclusão pesa: os filmes sem gênero precisam de outra decisão"
+
+excluidas = ratings_clean.join(F.broadcast(ids_excluidos), "movieId", "left_anti").cache()
+assert excluidas.count() == avaliacoes_antes_exclusao - avaliacoes_excluidas
+ratings_clean.unpersist()
+ratings_clean = excluidas
+movies_clean = movies_clean.filter(F.col("origem_genero") != "sem gênero")
+for nome, df in [("ratings_clean", ratings_clean), ("movies_clean", movies_clean)]:
+    df.createOrReplaceTempView(nome)
+restantes = por_usuario["total"] - por_usuario["excluidas"]
+print(f"Depois da limpeza (2.2-a e 2.2-d): {int(restantes.sum()):,} avaliações, {movies_clean.count():,} filmes no catálogo; "
+      f"usuários com menos de 20 avaliações: {int((restantes < 20).sum())} (mínimo: {int(restantes.min())})")
+assert movies_clean.filter(F.col("genres") == "Unknown").limit(1).count() == 0
+
+# %% [markdown]
+# **Leitura dos resultados.**
+#
+# - **Quem sai:** 240 filmes, com 1.406 avaliações. No IMDb, 209 só têm gêneros que não existem no MovieLens (145 só `Short` e 26 só `Music`), 16 não têm gênero e 15 têm código ausente. Dos 55 com 5 ou mais avaliações, 46 são curtas.
+# - **Por que o kNN não resolve:** nos 1.100 curtas com gênero no MovieLens e 5 ou mais avaliadores, o kNN acerta 51,0%, e chutar o gênero mais comum entre os curtas (Animation) acerta 52,7%; na faixa 5–9, 41,2% contra 53,1%; na faixa 10–49, o kNN fica 7,8 pontos acima (56,2% contra 48,4%), abaixo dos 10 pontos exigidos pelo critério da 2.2-c (`analises/resultados_casos_sem_tratamento.txt`). A validação da 2.2-c foi feita em filmes com gênero, quase todos longas, e não vale para essa população.
+# - **Peso:** as avaliações excluídas são 0,0056% do total; 823 usuários perdem alguma avaliação, no máximo 5,0% das suas, e nenhum perde todas. O critério de "não pesa" é atendido.
+# - **Depois da limpeza:** 24.998.518 avaliações e 62.176 filmes no catálogo. Um usuário fica com 19 avaliações; os outros continuam com pelo menos 20.
+# - **Black Mirror** sai junto com os demais: o código IMDb dele aponta para um curta homônimo (2.2-b), cujo único gênero é `Short`.
+#
+# **Limitação:** a exclusão tem direção conhecida: saem sobretudo curtas, vídeos musicais e títulos sem cadastro no IMDb. O efeito no perfil é pequeno, porque esses filmes somam no máximo 5% das avaliações de um usuário.
+#
+# **Consequência:** `Unknown` deixa de existir. O perfil de 3.1 passa a ter 19 gêneros, e P1 não depende de um atributo que registrava falta de informação, e não preferência.
 
 # %% [markdown]
 # ### 2.3 Integração das tabelas
@@ -517,11 +675,11 @@ plt.show()
 # %%
 # [2.3-a] Comparação entre dados-alvo e dados tratados; liberação do cache da seleção
 linhas_removidas = total_avaliacoes - ratings_clean.count()
-print("Avaliações removidas na limpeza:", linhas_removidas)
-if linhas_removidas == 0:
-    print("Os resultados de 1.5–1.8 valem também para as avaliações tratadas; "
-          "nos gêneros, os filmes sem gênero recebem o gênero do IMDb ou continuam `Unknown` (2.2-b); 2.6 mostra o efeito.")
-_ = ratings_sel.unpersist()  # ratings_clean já está materializado em cache (2.2)
+print(f"Avaliações removidas na limpeza: {linhas_removidas:,} ({100 * linhas_removidas / total_avaliacoes:.4f}% dos dados-alvo): "
+      f"{duplicadas_fusao:,} repetidas na fusão de títulos (2.2-a) e {avaliacoes_excluidas:,} de filmes sem gênero (2.2-d)")
+assert linhas_removidas == duplicadas_fusao + avaliacoes_excluidas
+print("Os resultados de 1.5–1.8 descrevem os dados-alvo; 2.6 mostra o que muda nos dados tratados.")
+_ = ratings_sel.unpersist()  # ratings_clean já está materializado em cache (2.2-d)
 
 # %%
 # [2.3-b] Integração: joins no grão esperado e expansão por gênero
@@ -704,7 +862,7 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Esparsidade:** a matriz usuário × filme tem 9.597.558.427 células, das quais só 25.000.095 (0,26%) têm nota. O usuário mediano avaliou 0,12% dos filmes; o mais ativo, 54,5%.
+# - **Esparsidade:** a matriz usuário × filme tem 9.558.548.587 células, das quais só 24.998.518 (0,26%) têm nota. O usuário mediano avaliou 0,12% dos filmes; o mais ativo, 54,6%.
 # - **Recorte de teste:** mesmo entre os 300 filmes mais avaliados, só 17,2% das células têm nota.
 # - **Efeito da imputação:**
 #   - o DP das notas cai de 1,02 (só notas reais) para 0,45 com a média da categoria e 0,52 com a média do filme: a variação real é reduzida à metade;
@@ -717,10 +875,10 @@ plt.show()
 # %% [markdown]
 # ### 2.6 Distribuições depois do tratamento
 #
-# Nenhuma avaliação foi removida. Por isso, só se repetem os testes que o tratamento pode alterar:
+# A limpeza removeu poucas avaliações (fusão de títulos repetidos em 2.2-a e exclusão dos filmes sem gênero em 2.2-d) e mudou o gênero dos filmes preenchidos pelo IMDb. Por isso, só se repetem os testes que o tratamento pode alterar:
 #
-# - **(a)** a distribuição da nota, que deve ser idêntica;
-# - **(b)** filmes, avaliações, média e desvio-padrão por gênero, antes e depois do preenchimento;
+# - **(a)** a distribuição da nota, que deve ficar praticamente igual;
+# - **(b)** filmes, avaliações, média e desvio-padrão por gênero, antes e depois do tratamento;
 # - **(c)** as notas dos filmes que receberam gênero do IMDb, comparadas às do gênero inteiro;
 # - **(d)** o qui-quadrado gênero × grupo de nota, com o V de Cramér antes e depois.
 #
@@ -730,11 +888,12 @@ plt.show()
 # [2.6] Distribuições depois do tratamento: o que muda com o preenchimento do gênero
 from scipy import stats
 
-# (a) Nota: nenhuma avaliação foi removida, então a distribuição precisa ser idêntica à de 1.5.
+# (a) Nota: poucas avaliações saíram na limpeza, então a distribuição precisa ficar praticamente igual à de 1.5.
 dist_nota_tratada = ratings_clean.groupBy("rating").count().toPandas().set_index("rating")["count"].sort_index()
 dist_nota_alvo = rating_distribution.select("rating", "count").toPandas().set_index("rating")["count"].sort_index()
-print(f"(a) Distribuição da nota idêntica antes e depois do tratamento: {dist_nota_tratada.equals(dist_nota_alvo)} "
-      f"({int(dist_nota_tratada.sum()):,} avaliações)")
+diferenca_nota = (100 * dist_nota_tratada / dist_nota_tratada.sum() - 100 * dist_nota_alvo / dist_nota_alvo.sum()).abs()
+print(f"(a) Distribuição da nota antes × depois do tratamento: {int(dist_nota_alvo.sum()):,} → {int(dist_nota_tratada.sum()):,} "
+      f"avaliações; maior diferença de proporção = {diferenca_nota.max():.4f} p.p. (nota {diferenca_nota.idxmax()})")
 
 # (b) Gêneros: filmes, avaliações, média e DP antes (dados-alvo) e depois (dados tratados).
 antes = dist_generos.assign(genre=dist_generos["genre"].replace({SEM_GENERO: "Unknown"}))[
@@ -743,6 +902,7 @@ depois = (ratings_genres.groupBy("genre")
     .agg(F.count("*").alias("avaliacoes"), F.avg("rating").alias("media"), F.stddev("rating").alias("dp"))
     .join(movie_genres.groupBy("genre").agg(F.count("*").alias("filmes")), "genre", "right")
     .toPandas().fillna({"avaliacoes": 0}).set_index("genre"))
+depois = depois.reindex(antes.index.union(depois.index)).fillna({"avaliacoes": 0, "filmes": 0})  # Unknown deixa de existir
 comparacao_generos = antes.merge(depois, left_index=True, right_index=True, how="left", suffixes=("_antes", "_depois"))
 comparacao_generos["Δ_filmes"] = comparacao_generos["filmes_depois"] - comparacao_generos["filmes_antes"]
 comparacao_generos["Δ_avaliacoes"] = comparacao_generos["avaliacoes_depois"] - comparacao_generos["avaliacoes_antes"]
@@ -803,9 +963,9 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **(a) Nota:** a distribuição das 25.000.095 notas é idêntica antes e depois do tratamento, porque nenhuma avaliação foi removida. Os histogramas e resumos de 1.5 continuam válidos.
-# - **(b) Gêneros:** `Unknown` perde 4.822 filmes e 25.221 avaliações (de 26.627 para 1.406). As avaliações vão sobretudo para Drama (+12.902), Comedy (+7.269), Adventure (+4.127), Action (+3.708) e Fantasy (+3.675). Fora de `Unknown`, a média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 707 filmes). A média de `Unknown` sobe de 3,33 para 3,45, agora sobre só 1.406 avaliações.
+# - **(a) Nota:** saem 1.577 das 25.000.095 avaliações (2.2-a e 2.2-d), e a proporção de cada nota muda no máximo 0,0006 ponto percentual (nota 4,0). Os histogramas e resumos de 1.5 continuam válidos.
+# - **(b) Gêneros:** `Unknown` deixa de existir: 4.822 filmes (25.221 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. As avaliações vão sobretudo para Drama (+12.749), Comedy (+7.164), Adventure (+4.065), Action (+3.733) e Fantasy (+3.675); esses saldos incluem o efeito da fusão (2.2-a). A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes).
 # - **(c) Filmes preenchidos:** em geral, têm notas menores que a média do gênero: Drama 3,43 contra 3,68, Comedy 3,21 contra 3,42 e Action 3,02 contra 3,47. Horror é a exceção (3,39 contra 3,29). São filmes pouco vistos, e os filmes pouco vistos têm notas mais baixas (consulta "nicho × populares" de 1.7-c). Como pesam no máximo 0,87% das avaliações de um gênero (Documentary), as médias dos gêneros quase não mudam.
-# - **(d) Associação gênero × nota:** fora de `Unknown`, o V de Cramér muda no máximo 0,0001 (Comedy e Action). O de `Unknown` cai de 0,0051 para 0,0024. Drama continua o gênero mais associado à nota (V = 0,119), e todas as associações seguem fracas.
+# - **(d) Associação gênero × nota:** o V de Cramér de cada gênero muda no máximo 0,0001 (Comedy e Action). Drama continua o gênero mais associado à nota (V = 0,119), e todas as associações seguem fracas.
 #
-# **Consequência:** o preenchimento não altera as distribuições estudadas na Seção 1. `Unknown` passa a 0,006% das avaliações, e o efeito chega ao perfil por usuário em 3.1.
+# **Consequência:** o tratamento não altera as distribuições estudadas na Seção 1. `Unknown` deixa de existir, e o efeito chega ao perfil por usuário em 3.1.

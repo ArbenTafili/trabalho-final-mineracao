@@ -12,10 +12,10 @@ O notebook atual vai até a **seção 3 (Transformação)**. P1 e P2 são as pr�
 ```
 fonte/                fontes do notebook, um arquivo .py por seção  ← só aqui se edita
 notebook/             notebook montado, com as saídas da última execução no Colab
-scripts/              montar, executar, baixar dados, dados sintéticos, números de controle, conferência manual (D3)
+scripts/              montar, executar, baixar dados, dados sintéticos, números de controle, recorte do IMDb
 tests/                testes (estrutura e execução com dados sintéticos)
-conferencia_manual/   títulos repetidos, conferidos à mão no TMDb e no IMDb (D3)
 analises/             medições exploratórias que embasam as decisões (fora do notebook)
+docs/justificativas.md justificativas de todas as decisões, em linguagem simples
 docs/decisoes.md      registro das decisões e dos votos da mesa de avaliação
 dados/                MovieLens 25M e arquivo do IMDb (fora do git)
 execucoes/            execuções locais (fora do git)
@@ -60,7 +60,7 @@ O último comando baixa o arquivo oficial do GroupLens (262 MB), confere o MD5 e
    ```bash
    .venv/bin/pytest
    ```
-4. **Execução completa local, opcional** (cerca de 4 minutos no M1 Pro, pico de 4,1 GB; no Colab gratuito leva uns 30): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória. Com `--nucleos 2`, o Spark usa 2 núcleos, como no Colab.
+4. **Execução completa local, opcional** (cerca de 6 minutos no M1 Pro, pico de 3,3 GB; no Colab gratuito leva uns 32): os dados reais, no Mac. Mostra o tempo de cada célula e o pico de memória. Com `--nucleos 2`, o Spark usa 2 núcleos, como no Colab.
    ```bash
    .venv/bin/python scripts/executar_notebook.py --dados dados/ml-25m
    ```
@@ -111,13 +111,14 @@ O gênero e o ano que faltam no MovieLens vêm do arquivo público `title.basics
 .venv/bin/python scripts/recortar_imdb.py
 ```
 
-O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial), com a data e o MD5 do arquivo de origem em `imdb_recorte_movielens.info`. A dupla guarda uma cópia num local privado (por exemplo, no Drive) para que as duas execuções usem o mesmo recorte. O recorte usado na v6 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`.
+O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial), com a data e o MD5 do arquivo de origem em `imdb_recorte_movielens.info`. A dupla guarda uma cópia num local privado (por exemplo, no Drive) para que as duas execuções usem o mesmo recorte. O recorte usado na v6 e na v7 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`.
 
-## Decisões e conferência manual
+## Decisões e justificativas
 
+- [`docs/justificativas.md`](docs/justificativas.md): cada decisão do trabalho, com o que foi decidido, por quê, com que números, as alternativas descartadas e as limitações.
 - [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com sete pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
 - [`analises/chave_imdb.py`](analises/chave_imdb.py): conferência automática da chave MovieLens → IMDb em todos os filmes, com a margem de erro dos gêneros e dos anos preenchidos (proposta 2-C). Substituiu a conferência à mão dos 38 filmes sem gênero mais avaliados.
-- [`conferencia_manual/`](conferencia_manual/COMO_PREENCHER.md): títulos repetidos (D3), ainda conferidos à mão.
+- [`analises/casos_sem_tratamento.py`](analises/casos_sem_tratamento.py): o que continua sem tratamento depois do IMDb e o peso de cada caso (D6). Com essa medição, a regra passou a ser: o que nenhuma regra automática trata e não pesa é excluído com justificativa, e os títulos cadastrados duas vezes são fundidos por regra, sem conferência à mão.
 
 ## Reprodutibilidade
 
@@ -127,11 +128,11 @@ Os resultados não dependem da máquina nem do número de núcleos. O Spark devo
 - a amostra de notas (1.5-b, 2.4) é sorteada pelo hash de `userId` e `movieId`, e não pela divisão interna do Spark;
 - os quantis da seção 1 são exatos, não aproximados.
 
-Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os números de controle idênticos. Na v6, em 19/11/2026, o Mac (8 núcleos) e o Colab (2 núcleos) deram os 16 números idênticos. Só mudam os tempos da 3.9, que dependem da máquina, e a ordem em que aparecem dois gêneros empatados na lista de votos do exemplo da 2.2-c.
+Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os números de controle idênticos. Na v6 e na v7, em 19/11/2026, o Mac (8 núcleos) e o Colab (2 núcleos) deram os números de controle idênticos (16 na v6, 21 na v7). Só mudam os tempos da 3.9, que dependem da máquina, e a ordem em que aparecem itens empatados em duas listas: os votos do exemplo da 2.2-c e o décimo atributo mais frequente entre os atípicos da 3.7-a.
 
 ## Números de controle
 
-`scripts/numeros_controle.py` extrai 16 números que resumem a execução (avaliações, usuários, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Na v6 executada no Colab em 19/11/2026: 25.000.095 avaliações, 162.541 usuários, 4.822 filmes com gênero do IMDb (240 continuam sem gênero), acerto do kNN de 83,35% nos filmes com 10 ou mais avaliadores e 1.365 usuários atípicos.
+`scripts/numeros_controle.py` extrai 21 números que resumem a execução (avaliações, usuários, fusão e exclusão, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Na v7 executada no Colab em 19/11/2026: 24.998.518 avaliações nos dados tratados (das 25.000.095 originais), 162.541 usuários, 62.176 filmes no catálogo, 7 cópias fundidas, 240 filmes sem gênero excluídos, 4.822 filmes com gênero do IMDb, acerto do kNN de 83,38% nos filmes com 10 ou mais avaliadores, PCA base com 66,84% e 1.293 usuários atípicos.
 
 ## Dados e licença
 

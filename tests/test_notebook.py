@@ -62,6 +62,8 @@ def test_executa_inteiro_com_dados_sinteticos(tmp_path_factory):
     saida = tmp_path_factory.mktemp("execucao") / "sintetico.ipynb"
     executar(dados, saida)  # termina com SystemExit se alguma célula falhar
     valores = controles(textos_por_celula(saida))
-    assert valores["nota idêntica após tratamento"] == "True"
+    assert valores["cópias fundidas (títulos repetidos)"] == "1"  # só a "Cópia Duplicada"; as outras ficam separadas
+    assert valores["filmes excluídos (sem gênero)"] not in ("—", "0")
+    assert float(valores["diferença máxima da nota após tratamento (p.p.)"]) < 0.5
     assert valores["filmes com gênero do IMDb"] != "—"
     assert valores["mínimo de avaliadores (kNN)"] != "—"

@@ -6,8 +6,10 @@ Além de imitar a forma dos dados reais (popularidade desigual, meia estrela só
 multirrótulo), inclui de propósito os casos de borda que o notebook precisa tratar:
 - filmes sem gênero, entre eles um com exatamente 9 e outro com exatamente 10 avaliadores (limite da imputação);
 - filmes sem ano no título;
-- títulos repetidos: mesma cópia cadastrada duas vezes (mesmo TMDb, usuários em comum), homônimos (códigos
-  diferentes), mesmo TMDb com gêneros sem nada em comum, e uma cópia sem gênero;
+- títulos repetidos: mesma cópia cadastrada duas vezes (mesmo TMDb, usuários em comum: é fundida), homônimos
+  (códigos diferentes), mesmo TMDb com gêneros sem nada em comum (ficam separados) e uma cópia sem gênero;
+- filmes sem gênero que o IMDb não resolve (só 'Short', sem gênero ou código ausente): só entre os pouco avaliados,
+  como nos dados reais, para que a exclusão da 2.2-d passe no critério de 'não pesa';
 - refilmagem (mesmo nome, anos diferentes);
 - IMAX quase sempre acompanhado de outro gênero.
 O sinal de gênero é forte o bastante para a imputação passar da moda, para que esse trecho do código seja exercitado.
@@ -132,7 +134,7 @@ def gerar(destino, n_usuarios, n_filmes, semente=1):
     tmdb[:5] = np.nan
     links = pd.DataFrame({"movieId": movies.movieId, "imdbId": imdb, "tmdbId": tmdb})
 
-    imdb = recorte_imdb(movies, links, rng)
+    imdb = recorte_imdb(movies, links, ratings.groupby("movieId").size(), rng)
 
     destino = Path(destino)
     destino.mkdir(parents=True, exist_ok=True)
@@ -146,24 +148,28 @@ def gerar(destino, n_usuarios, n_filmes, semente=1):
             "imdb": len(imdb)}
 
 
-def recorte_imdb(movies, links, rng):
-    """Recorte do IMDb com os casos de borda: não encontrados, só 'Short', TV, anos divergentes, Family no lugar de Children."""
+def recorte_imdb(movies, links, avaliacoes, rng, max_sem_tratamento=3):
+    """Recorte do IMDb com os casos de borda: não encontrados, só 'Short', TV, anos divergentes, Family no lugar de Children.
+
+    Os filmes sem gênero que o IMDb não resolve ficam entre os que têm até `max_sem_tratamento` avaliações."""
     linhas = []
     for (_, filme), imdb_id in zip(movies.iterrows(), links["imdbId"]):
-        if rng.random() < 0.005:  # código que o IMDb não tem mais
+        sem_genero = filme["genres"] == "(no genres listed)"
+        pouco_avaliado = avaliacoes.get(filme["movieId"], 0) <= max_sem_tratamento
+        if rng.random() < 0.005 and (not sem_genero or pouco_avaliado):  # código que o IMDb não tem mais
             continue
         titulo = filme["title"].strip()
         ano = titulo[-5:-1] if titulo.endswith(")") and titulo[-5:-1].isdigit() else str(int(rng.integers(2015, 2020)))
         if rng.random() < 0.02:
             ano = str(int(ano) + (1 if rng.random() < 0.8 else 6))
-        if filme["genres"] == "(no genres listed)":
-            sorteio = rng.random()
+        if sem_genero:
+            sorteio = rng.random() if pouco_avaliado else 1.0
             if sorteio < 0.10:
                 generos = "Short"
             elif sorteio < 0.15:
                 generos = None
             else:
-                generos = ",".join(sorted(rng.choice([g for g in GENEROS if g != "IMAX"], size=int(rng.integers(1, 3)),
+                generos = ",".join(sorted(rng.choice([("Family" if g == "Children" else g) for g in GENEROS if g != "IMAX"], size=int(rng.integers(1, 3)),
                                                      replace=False)))
         else:
             gs = [("Family" if g == "Children" and rng.random() < 0.6 else g) for g in filme["genres"].split("|") if g != "IMAX"]

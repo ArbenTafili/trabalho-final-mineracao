@@ -20,7 +20,7 @@ Os critérios de cada decisão são fixados **antes** de ver o resultado.
 
 ## D1 — Repositório e testes locais
 
-**Status:** aprovada com ajustes em 18/11/2026; ajustes aceitos pelo aluno; em implementação.
+**Status:** aprovada com ajustes em 18/11/2026; ajustes aceitos pelo aluno; implementada na v6 (19/11/2026) e ampliada na v7 (testes da fusão e da exclusão, 21 números de controle).
 
 **Votos:** 4 aprovam com ajuste, 1 aprova.
 
@@ -34,7 +34,7 @@ Os critérios de cada decisão são fixados **antes** de ver o resultado.
 
 ## D2 — Preencher o gênero com contagem ponderada por 1/√N
 
-**Status:** aprovada com ajustes em 18/11/2026; aguardando o limite de perda de acerto.
+**Status:** superada. A regra 1/√N ficou só como comparação (rodada 2); o gênero que falta vem do IMDb (proposta 2-B, v6), a chave é conferida por código (proposta 2-C) e os filmes que continuam sem gênero são excluídos (D6, v7).
 
 **Proposta:** para um filme sem gênero, contar as avaliações que os avaliadores dele deram a filmes de cada gênero g (sem o próprio filme), dividir por √N_g e escolher o maior. N_g = número de filmes do gênero g no catálogo; um filme com vários gêneros conta em cada um.
 
@@ -117,7 +117,7 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 ## D3 — Títulos repetidos
 
-**Status:** aprovada com ajustes em 18/11/2026; aguardando a conferência manual dos 8 pares.
+**Status:** substituída pela D6 em 19/11/2026: os 8 pares são decididos por regra automática, sem conferência à mão (7 fundidos, Blackout separado).
 
 **Fatos medidos:** 98 títulos idênticos (nome + ano), 196 filmes; nenhum par com o mesmo código IMDb; 8 pares com o mesmo código TMDb. Os outros 90 são filmes diferentes com o mesmo nome (ex.: War of the Worlds (2005) de Spielberg e a produção homônima). 2.747 nomes aparecem com anos diferentes (refilmagens).
 
@@ -132,7 +132,7 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 ## D4 — Filmes sem ano no título e gêneros raros
 
-**Status:** aprovada com ajustes em 18/11/2026; arquivo do IMDb baixado em 18/11/2026 (MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`). O IMDb tem ano para 409 dos 412 filmes sem ano. Nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0% (`analises/resultados_imdb.txt`).
+**Status:** aprovada com ajustes em 18/11/2026; ano preenchido pelo IMDb na v6; teste de sensibilidade do corte de 2% com War ainda não feito. Arquivo do IMDb baixado em 18/11/2026 (MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`). O IMDb tem ano para 409 dos 412 filmes sem ano. Nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0% (`analises/resultados_imdb.txt`).
 
 **Fatos medidos:** 412 filmes sem ano no título (11.749 avaliações; 264 deles também sem gênero), incluindo Ready Player One e Moonlight.
 
@@ -154,8 +154,51 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 **Proposta:** IMAX sai do vetor do perfil (é formato de exibição, não gênero); Animation e Children viram um grupo só no vetor; os rótulos continuam nos dados.
 
+## D6 — Excluir o que não tem tratamento automático (proposta 3)
+
+**Status:** aprovada com ajustes pela mesa de 7 em 19/11/2026 (7 aprovam com ajuste); aceita pelo aluno; implementada na v7 (19/11/2026).
+
+**Princípio do aluno:** um caso que nenhuma regra automática consegue tratar, e que não pesa de forma expressiva, é excluído dos dados-alvo, com a justificativa registrada.
+
+**Fatos medidos** (`analises/casos_sem_tratamento.py` → `analises/resultados_casos_sem_tratamento.txt`):
+- **A. Filmes que continuam sem gênero depois do IMDb:** 240 filmes, 1.406 avaliações (0,0056%). Motivos: 209 só têm gêneros que não existem no MovieLens (145 só "Short"), 16 têm IMDb sem gênero e 15 têm código ausente do IMDb. Por avaliadores: 7 com 0, 131 com 1–2, 47 com 3–4, 36 com 5–9 e 19 com 10 ou mais. Excluir os 233 com avaliação afeta 823 usuários, no máximo 5,0% das avaliações de um usuário; ninguém perde todas, e o menor resto é de 19 avaliações.
+- **B. Filmes que continuam sem ano:** 3 filmes, 2 avaliações; os 2 avaliados também estão em A, e o terceiro não tem avaliação.
+- **C. Títulos repetidos com o mesmo TMDb (D3):** em 6 dos 8 pares, um dos dois códigos IMDb não existe mais (é sempre o da cópia mais avaliada); Enron tem as duas entradas no IMDb com o mesmo ano e 109 × 110 minutos; Blackout são filmes diferentes (2008, 85 min, Horror × 2007, 95 min, Drama). 171 usuários avaliaram as duas cópias de algum dos 7 pares.
+
+**Proposta, como foi à mesa:** em A, gênero pelo kNN da 2.2-c para os 55 filmes com 5 ou mais avaliadores e exclusão dos 178 com 1 a 4 e dos 7 sem avaliação; alternativa simples: excluir os 240 sem kNN. Em C, fusão automática pelo IMDb (código ausente, ou duração até 5 minutos de diferença e gênero em comum); alternativa: excluir a cópia menos avaliada (363 avaliações).
+
+**Votos:** 7 aprovam com ajuste. A mesa prefere a alternativa simples de A e a fusão em C.
+
+**Por que sem kNN em A:** dos 55 filmes com 5 ou mais avaliadores, 46 são curtas no IMDb. Nos 1.100 curtas com gênero no MovieLens e 5 ou mais avaliadores, o kNN acerta 51,0%, e chutar o gênero mais comum entre os curtas (Animation) acerta 52,7%; na faixa 5–9, 41,2% contra 53,1%. A validação da 2.2-c (filmes de longa-metragem, linha de base Drama) não vale para essa população; só 14,8% dos curtas são Drama. Num grupo de 117 filmes parecidos, mas formado sobretudo por códigos ausentes do IMDb e longas, o kNN vai bem (62,4% contra 27,4%; medição feita pela mesa, que não está nos arquivos de `analises/`), mas ele representa pouco os 55. Na faixa 10–49, o kNN supera o chute nos curtas em 7,8 pontos (56,2% contra 48,4%), abaixo dos 10 pontos do critério. O ajuste da 2-B já previa não ter etapa de reserva se os restantes fossem poucos. Pelo princípio do aluno, esses filmes não têm tratamento automático seguro.
+
+**Ajustes pedidos:**
+1. A: excluir os 240 filmes sem gênero (1.406 avaliações), sem kNN; a 2.2-c continua como validação; registrar que o Black Mirror sai com chave errada;
+2. os 7 sem avaliação saem por necessidade do código (para `Unknown` deixar de existir e `prop_unknown` não virar coluna constante), não pelo peso;
+3. C: fundir pelo critério já registrado na D3 (mesmo título, mesmo ano, mesmo TMDb e pelo menos um gênero do MovieLens em comum: funde 7, separa Blackout); o que o IMDb mostra entra como evidência; sem o limite de 5 minutos;
+4. integridade da fusão: a cópia que fica herda o código IMDb que existe; a tabela movieId antigo → novo vale para ratings, tags e links; a fusão vem antes da 2.2-b e da 2.2-c; a seção 1 descreve os dados antes da fusão;
+5. escrever o critério de "não pesa" em números (fração do total de avaliações, máximo por usuário, ninguém perdendo todas), declarando que foi fixado depois de ver A e que vale daqui em diante;
+6. textos: o roteiro deixa de dizer que todos os usuários têm pelo menos 20 avaliações depois da limpeza (1 fica com 19); contar as avaliações excluídas por motivo;
+7. execução: registrar antes os números de controle esperados (avaliações 25.000.095 → 24.998.518; filmes 62.423 → 62.176; usuários 162.541); casos sintéticos e testes para a fusão e a exclusão; retirar `conferencia_manual/` e o gerador; uma só execução no Colab.
+
+**Aceite do aluno (19/11/2026):** "sim", com o pedido de guardar todas as justificativas (desta e das decisões anteriores) num lugar só: `docs/justificativas.md`.
+
+**Números de controle esperados, registrados antes da execução com os dados reais** (contas a partir das medições acima):
+- avaliações nos dados tratados: 25.000.095 − 171 repetidas − 1.406 excluídas = 24.998.518;
+- filmes no catálogo: 62.423 − 7 fundidos − 240 excluídos = 62.176;
+- filmes avaliados: 59.047 − 7 fundidos − 233 excluídos com avaliação = 58.807;
+- usuários: 162.541 (ninguém perde todas as avaliações);
+- cópias fundidas: 7; filmes excluídos: 240; avaliações excluídas: 1.406;
+- seção 1, gênero do IMDb (4.822) e filmes que continuam sem gênero na 2.2-b (240): sem mudança;
+- kNN, PCA, atípicos e Hopkins: mudam, porque `prop_unknown` sai do vetor base e a fusão mexe em 7 filmes; sem valor esperado.
+
+**Implementação (v7, 19/11/2026).** Duas células novas na seção 2: 2.2-a (fusão dos títulos repetidos, antes da integração com o IMDb) e 2.2-d (exclusão, depois da validação do kNN). Na execução com os dados reais no Mac, todos os números esperados bateram: 24.998.518 avaliações, 62.176 filmes no catálogo, 58.807 filmes avaliados, 162.541 usuários, 7 cópias fundidas, 171 avaliações repetidas, 240 filmes e 1.406 avaliações excluídos. Detalhes:
+- **gêneros do filme fundido:** os da cópia mais avaliada (regra sem julgamento caso a caso; a interseção da D3 apagaria, por exemplo, o Musical de Lagaan, que o IMDb também marca);
+- **código IMDb:** 6 das 7 cópias que ficaram herdaram o código da cópia fundida, porque o delas não existe mais no IMDb;
+- **critério de "não pesa"** (fixado depois de ver os casos, vale daqui em diante): no máximo 0,1% das avaliações, no máximo 10% das avaliações de um usuário e nenhum usuário perdendo todas. Resultado: 0,0056%, 5,0% e 0; 823 usuários afetados; 1 usuário fica com 19 avaliações;
+- **seção 3:** sem `prop_unknown`, o vetor base tem 21 atributos; o PCA passa a ter d′ = 6 (66,84%, antes 7 e 68,41%); atípicos 1.293 (antes 1.365); Hopkins robusto 0,705 no PCA. O vetor revisado quase não muda (69,13%; 1.078 atípicos). O kNN da 2.2-c acerta 83,38% (antes 83,35%), porque a fusão muda as partes da validação cruzada;
+- **correções encontradas:** o gerador de dados sintéticos sorteava "Children" como gênero do IMDb para filmes sem gênero (o IMDb usa "Family"), o que deixava filmes populares sem gênero; a 3.8-a imprimia "log(20)" fixo na normalização da diversidade, que agora usa o número real de gêneros (19).
+
 ## Pendências do aluno
 
-- Rodada própria sobre a D3: a conferência à mão dos 8 pares de títulos repetidos choca com o princípio do aluno de não conferir filme a filme.
 - Aprovação da D5 para ir à mesa.
-- Decisão sobre Musical e gêneros raros (agrupar só no vetor ou já no pré-processamento).
+- Decisão sobre Musical e gêneros raros (agrupar só no vetor ou já no pré-processamento), junto com o teste de sensibilidade do corte de 2% com War (D4).
