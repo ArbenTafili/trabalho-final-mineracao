@@ -43,7 +43,7 @@ Os critérios de cada decisão são fixados **antes** de ver o resultado.
 **Ajustes:**
 - fixar antes de rodar a perda máxima de acerto aceitável em relação ao kNN; se a regra passar do limite, o kNN continua e a regra entra como comparação;
 - medir α = 0; 0,5 e 1 (peso N^−α) nas mesmas 5 partes da validação, com N_g calculado só no treino; informar média e desvio-padrão do acerto;
-- os 38 filmes sem gênero mais avaliados são conferidos à mão no IMDb e ficam com o gênero conferido; eles servem de teste externo;
+- os 38 filmes sem gênero mais avaliados são conferidos à mão no IMDb e ficam com o gênero conferido; eles servem de teste externo (substituído em 19/11/2026 pela proposta 2-C: a chave é conferida por código em todos os filmes);
 - mostrar no notebook um filme calculado passo a passo.
 
 **Medição exploratória (18/11/2026, fora do notebook).** Acerto (gênero previsto entre os verdadeiros) em filmes com gênero conhecido, por número de avaliadores. Faixas abaixo de 10: modelo treinado nos filmes com 10 ou mais; faixas de 10 em diante: validação cruzada de 5 partes. O kNN aqui usa a proporção de gêneros do público, não a média dos perfis da v5, por isso fica um pouco abaixo dos 83,4% do notebook.
@@ -81,6 +81,39 @@ Texto da proposta, como foi à mesa: O aluno perguntou se os ~4 mil filmes que c
 - nos 57.100 filmes com gênero nas duas fontes, 97,7% têm pelo menos um gênero em comum (mesmos gêneros: 46,9%; Jaccard médio 0,719; menor concordância em Musical, 48%);
 - "Music" do IMDb não é convertido para Musical: só 15% desses filmes são Musical no MovieLens;
 - teste externo do kNN nos próprios filmes sem gênero: 63,8% na faixa 5–9 (chute 51,8%), 66,4% em 10–49, 77,8% em 50+; com 1–4 avaliadores, igual ou pior que o chute.
+
+**Proposta 2-C (conferência automática da chave), 19/11/2026: aprovada pela mesa de 7 (6 aprovam com ajuste, 1 aprova); ajustes aceitos e implementados em 19/11/2026.** O aluno aceitou os ajustes 1–4 e 6–9 e delegou à mesa e ao Claude a decisão sobre o ajuste 5.
+
+Texto da proposta, como foi à mesa: o aluno pediu que a conferência da chave não fosse feita filme a filme, e sim por uma regra executada por código sobre todos os filmes. `analises/chave_imdb.py` compara três sinais (título padronizado, ano e tipo no IMDb) e valida cada um nos 57.100 filmes com gênero nas duas fontes: com a chave verdadeira, 97,67% têm pelo menos um gênero em comum; com a chave sorteada, 40,02%. A concordância fica perto de 97% em todas as categorias de título, ano e tipo; a exceção é "sem ano no MovieLens" (147 filmes, 91,8%). Títulos diferentes são, em geral, traduções (Hachi-ko = The Story of Hachikō). Decisão proposta: nenhuma regra de exclusão; manter os 4.822 gêneros do IMDb e declarar a margem de erro (3,88% das chaves; até 187 filmes e 979 avaliações, 0,0039% do total); a conferência dos 38 filmes deixa de ser feita. Alternativas não escolhidas pelo aluno: (B) devolver a "sem gênero" 28 filmes com título diferente e ano divergente ou ausente (71 avaliações); (C) excluir curtas e episódios (539 filmes, 3.421 avaliações), que concordam 97,8% e 96,7%; (D) o kNN do público como segunda opinião: com ~5% de chaves erradas e ~17% de erro do kNN, só 10% a 16% dos marcados teriam chave errada, e o kNN cobre só 301 filmes preenchidos (10+ avaliadores).
+
+Votos: o cientista de dados aprova (mesmo que os 4.822 estivessem todos errados, seriam 0,10% das avaliações); os outros seis aprovam com ajuste. Ninguém rejeita a decisão central. A mesa conferiu as contas e apontou as premissas frágeis:
+- o grupo de controle não representa os filmes preenchidos: 90% deles entraram depois do ML-20M (movieId > 131.262), têm 20 vezes mais filmes sem ano (5,27% × 0,26%) e mais curtas (9,85% × 3,83%). No controle recente, a concordância é 97,01% e a chave sorteada, 35,27%;
+- a conta de 3,88% supõe que uma chave errada concorda como uma chave sorteada; uma chave que aponta para um título parecido (episódio, homônimo) concorda mais, então a margem não é "pior caso";
+- entre os filmes sem ano, título igual é justamente a marca de um homônimo (Black Mirror), e não um argumento a favor da chave;
+- nenhum sinal pega o Black Mirror (título igual, sem ano, curta): é a limitação da regra.
+
+Ajustes pedidos:
+1. margem recalculada no controle comparável (movieId > 131.262), separada pelo sinal de ano e ponderada por avaliações: cerca de 5,0% dos filmes (240) e 5,4% das avaliações (1.357; 0,0054% do total);
+2. chamar a margem de "estimativa sob a hipótese de que chave errada concorda como chave sorteada", e declarar junto que 3,0% dos filmes do controle comparável não têm nenhum gênero em comum;
+3. estender a margem ao ano: 409 anos preenchidos (11.747 avaliações) estão no grupo sem ano, em que o controle concorda 135 de 147 (IC 95% de 86,3% a 95,3%);
+4. medir o efeito por usuário: 7.793 usuários avaliaram algum filme preenchido; no mais exposto, eles são 10,7% das avaliações; 102 usuários passam de 5%;
+5. conferência à mão reduzida, escolhida pelo código: entre os 38 mais avaliados, só os 14 que não têm título igual, ano igual ou com 1 ano de diferença e tipo filme (13 preenchidos, 4.023 avaliações; a mesa tinha escrito 4.033);
+6. registrar o Black Mirror como controle positivo e limitação (homônimo sem ano), e o Sherlock Holmes (a série aponta para um episódio: gênero certo, chave errada);
+7. corrigir o texto: a faixa de 96,7% a 97,9% não inclui "especial" (99,6%, tipo em que a chave sorteada já concorda 96,9%);
+8. gravar o MD5 do `title.basics` no topo de `resultados_chave_imdb.txt` e registrar que o sinal de título usa `originalTitle`, que o recorte do notebook não tem;
+9. registrar o motivo de cada alternativa rejeitada (feito acima).
+
+Onde entra: só como texto na leitura da 2.2-b (4 a 6 linhas), sem célula de código nova, para não exigir outra execução no Colab (`montar_notebook.py --saidas` aproveita as saídas das células que não mudaram). A tabela completa fica neste registro e em `analises/`. O professor de Mineração preferiria a tabela no notebook na próxima vez que tudo for executado de novo; nesse caso, o recorte do IMDb precisa ganhar `originalTitle`.
+
+**Rodada de consenso sobre o ajuste 5, 19/11/2026: contraproposta aceita por unanimidade (5 aceitam, 2 aceitam com ajuste).** Ninguém preenche tabela: o código lista os 14 filmes (dos 38 sem gênero com 50 ou mais avaliações, os que não passam em "título igual, ano igual ou com 1 ano de diferença, tipo filme"), com título, ano e tipo do IMDb lado a lado e, por pedido do professor de Banco de Dados, os outros filmes do MovieLens com o mesmo título (igual depois de padronizar, ou um é o começo do outro). A tabela `conferencia_manual/filmes_sem_genero_mais_avaliados.csv` e a parte D2 do gerador e das instruções foram retiradas. Nenhum gênero muda. O que a lista mostra:
+- 11 se resolvem pela própria linha: séries sem ano no MovieLens (Cosmos, The OA, Death Note, Cosmos: A Spacetime Odyssey, 13 Reasons Why), traduções e títulos alternativos (Fantastic Beasts 2 = The Crimes of Grindelwald; 120 BPM; Somnio = Infinity Chamber), Paterson (sem ano no MovieLens), um episódio e um especial com título igual;
+- Whiplash (2013) é o curta; o longa de 2014 é outro filme do MovieLens (movieId 112552), com o mesmo gênero (Drama);
+- o Sherlock Holmes sem subtítulo aponta para "Mortal Fight", uma das três partes do filme de 1980; as outras duas (King of Blackmailers e The Hunt for the Tiger) estão separadas no MovieLens, então a chave provavelmente está certa;
+- Black Mirror é o controle positivo: a chave está errada (homônimo sem ano) e nenhum sinal da regra a pega. Esse filme não recebeu gênero, porque o único gênero do curta no IMDb é "Short". A limitação fica declarada na 2.2-b.
+
+Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque não se refazem por código): IMDb tt2492564 e TMDb 452830 (Black Mirror: os dois apontam para o curta de 4 minutos de Doug Aitken, de 2011); TMDb 127605 (Sherlock Holmes: página removida, endereço com o nome da série); TMDb 428948, títulos alternativos (Somnio consta como título de Infinity Chamber).
+
+**Implementação (19/11/2026).** `analises/chave_imdb.py` grava em `analises/resultados_chave_imdb.txt`, com o MD5 do `title.basics` lido (`694fa9cd5bad4d6f3f94384b7ed61c74`): a margem no controle comparável (29.412 filmes com movieId > 131.262; concordância 97,01%, chave sorteada 35,37%, 2,99% sem nenhum gênero em comum), separada pelo sinal de ano e ponderada por avaliações: 5,0% dos filmes (240) e 5,4% das avaliações (1.359; 0,0054% do total); anos: 135 de 147 concordam no controle sem ano (IC 95% de 86,3% a 95,3%), cerca de 56 dos 409 anos preenchidos possivelmente errados (até 94); por usuário: 7.793 usuários afetados, no máximo 10,7% das avaliações de um usuário, 102 acima de 5%, efeito esperado de 0,58 ponto percentual no mais exposto. No notebook, só texto na leitura da 2.2-b (conferência da chave, margem de erro e a limitação do homônimo sem ano); as células de código e as saídas da execução no Colab não mudaram.
 
 ## D3 — Títulos repetidos
 
@@ -123,6 +156,6 @@ Texto da proposta, como foi à mesa: O aluno perguntou se os ~4 mil filmes que c
 
 ## Pendências do aluno
 
-- Conferência manual dos 38 filmes (D2) e dos 8 pares (D3).
+- Rodada própria sobre a D3: a conferência à mão dos 8 pares de títulos repetidos choca com o princípio do aluno de não conferir filme a filme.
 - Aprovação da D5 para ir à mesa.
 - Decisão sobre Musical e gêneros raros (agrupar só no vetor ou já no pré-processamento).

@@ -12,9 +12,9 @@ O notebook atual vai até a **seção 3 (Transformação)**. P1 e P2 são as pr�
 ```
 fonte/                fontes do notebook, um arquivo .py por seção  ← só aqui se edita
 notebook/             notebook montado, com as saídas da última execução no Colab
-scripts/              montar, executar, baixar dados, dados sintéticos, números de controle, conferência manual
+scripts/              montar, executar, baixar dados, dados sintéticos, números de controle, conferência manual (D3)
 tests/                testes (estrutura e execução com dados sintéticos)
-conferencia_manual/   tabelas conferidas à mão no IMDb/TMDb (lidas pelo notebook)
+conferencia_manual/   títulos repetidos, conferidos à mão no TMDb e no IMDb (D3)
 analises/             medições exploratórias que embasam as decisões (fora do notebook)
 docs/decisoes.md      registro das decisões e dos votos da mesa de avaliação
 dados/                MovieLens 25M e arquivo do IMDb (fora do git)
@@ -116,7 +116,8 @@ O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial)
 ## Decisões e conferência manual
 
 - [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com sete pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
-- [`conferencia_manual/`](conferencia_manual/COMO_PREENCHER.md): filmes sem gênero e títulos repetidos conferidos à mão no IMDb e no TMDb.
+- [`analises/chave_imdb.py`](analises/chave_imdb.py): conferência automática da chave MovieLens → IMDb em todos os filmes, com a margem de erro dos gêneros e dos anos preenchidos (proposta 2-C). Substituiu a conferência à mão dos 38 filmes sem gênero mais avaliados.
+- [`conferencia_manual/`](conferencia_manual/COMO_PREENCHER.md): títulos repetidos (D3), ainda conferidos à mão.
 
 ## Reprodutibilidade
 

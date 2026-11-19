@@ -1,0 +1,174 @@
+Arquivo do IMDb lido: title.basics.tsv.gz, MD5 694fa9cd5bad4d6f3f94384b7ed61c74 (o completo: o sinal de título usa originalTitle, que o recorte do notebook não tem)
+
+Filmes com gênero nas duas fontes (controle): 57,100; pelo menos um gênero em comum: 97.7%
+Filmes sem gênero preenchidos pelo IMDb (alvo): 4,822 (25,221 avaliações)
+
+=== 1. Título (com primaryTitle e originalTitle) ===
+             filmes_controle  concordancia_pct  filmes_preenchidos  avaliacoes
+titulo                                                                        
+contido                 1134              97.6                 144         631
+diferente               2415              97.3                 352        2000
+igual                  53076              97.7                4249       22139
+quase igual              475              97.7                  77         451
+
+Só com primaryTitle (o que o recorte atual tem):  {'igual': 50684, 'diferente': 4335, 'contido': 1566, 'quase igual': 515} | alvo: {'igual': 3840, 'diferente': 743, 'contido': 160, 'quase igual': 79}
+
+=== 2. Ano ===
+                      filmes_controle  concordancia_pct  filmes_preenchidos  avaliacoes
+ano                                                                                    
+1 ano                            3411              97.5                 385        1250
+igual                           53013              97.7                4075       21089
+mais de 1 ano                     526              97.9                 108         284
+sem ano no IMDb                     3             100.0                   0           0
+sem ano no MovieLens              147              91.8                 254        2598
+
+=== 3. Tipo no IMDb ===
+          filmes_controle  concordancia_pct  filmes_preenchidos  avaliacoes
+tipo                                                                       
+curta                2186              97.8                 475        2851
+episódio              302              96.7                  64         570
+especial              478              99.6                  34         269
+filme               53681              97.7                4164       19961
+série                 453              97.1                  85        1570
+
+=== 4. Título × ano ===
+                                  filmes_controle  concordancia_pct  filmes_preenchidos  avaliacoes
+titulo      ano                                                                                    
+contido     1 ano                              76              97.4                  15          37
+            igual                            1032              97.7                 111         402
+            mais de 1 ano                      18              94.4                   2           3
+            sem ano no IMDb                     1             100.0                   0           0
+            sem ano no MovieLens                7             100.0                  16         189
+diferente   1 ano                             233              97.0                  31          65
+            igual                            2131              97.5                 293        1864
+            mais de 1 ano                      39              94.9                  11          21
+            sem ano no MovieLens               12              75.0                  17          50
+igual       1 ano                            3078              97.6                 333        1136
+            igual                           49406              97.7                3609       18587
+            mais de 1 ano                     462              98.3                  94         257
+            sem ano no IMDb                     2             100.0                   0           0
+            sem ano no MovieLens              128              93.0                 213        2159
+quase igual 1 ano                              24              95.8                   6          12
+            igual                             444              97.7                  62         236
+            mais de 1 ano                       7             100.0                   1           3
+            sem ano no MovieLens                0               0.0                   8         200
+
+=== 5. Curtas e episódios por número de avaliações (alvo) ===
+curta {'1–9': 426, '10–49': 45, '50–99': 0, '100+': 1}
+episódio {'1–9': 53, '10–49': 8, '50–99': 0, '100+': 2}
+
+=== 6. Exemplos do alvo com título diferente ou ano com mais de 1 ano de diferença ===
+                                                    title  n_avaliacoes                                            primaryTitle                                   originalTitle startYear titleType     titulo                   ano
+30077    Fantastic Beasts and Where to Find Them 2 (2018)           891             Fantastic Beasts: The Crimes of Grindelwald     Fantastic Beasts: The Crimes of Grindelwald      2018     movie  diferente                 igual
+47582                         120 Beats Per Minute (2017)            59                              120 BPM (Beats Per Minute)                       120 battements par minute      2017     movie  diferente                 igual
+46584                                       Somnio (2016)            56                                        Infinity Chamber                                Infinity Chamber      2016     movie  diferente                 igual
+44223                 Christmas Time In South Park (2000)            33                                 Christmas in South Park                         Christmas in South Park      2000     video  diferente                 igual
+46075                                    Den radio (2001)            32                                               Den radio                                       Den radio      2003     video      igual         mais de 1 ano
+57795                         Richard Says Goodbye (2018)            31                                           The Professor                                   The Professor      2018     movie  diferente                 igual
+35193  How the Lion Cub and the Turtle Sang a Song (1974)            29          How the Little Lion and the Turtle Sang a Song            Kak lvyonok i cherepakha peli pesnyu      1974     short  diferente                 igual
+44093                                Baby's Dinner (1895)            21                                             Baby's Meal                                   Repas de bébé      1895     short  diferente                 igual
+29990             Prime Suspect: Scent of Darkness (1995)            21                    Prime Suspect: The Scent of Darkness            Prime Suspect: The Scent of Darkness      1995   tvMovie  diferente                 igual
+26678                    The Private Life of a Cat (1944)            16                               The Private Life of a Cat                       The Private Life of a Cat      1946     short      igual         mais de 1 ano
+35529                  Man Walking Around a Corner (1887)            16                           Man Walking Around the Corner                   Man Walking Around the Corner      1887     short  diferente                 igual
+51837                                             Heroine            14                                               Heroin(e)                                       Heroin(e)      2017     short  diferente  sem ano no MovieLens
+37444                                        Мафия (2016)            13                                           Survival Game                      Mafiya. Igra na vyzhivanie      2016     movie  diferente                 igual
+35178                                     Hachi-ko (1987)            13                                    The Story of Hachikō                              Hachikô monogatari      1987     movie  diferente                 igual
+46447                                      Bolshoi (2017)            12                                                 Bolshoy                                         Bolshoy      2017     movie  diferente                 igual
+30585                  Charlotte and Her Boyfriend (1960)            11                             Charlotte and Her Boyfriend                          Charlotte et son Jules      1958     short      igual         mais de 1 ano
+46529                                  Simon's Cat (2012)            11                                             Simon's Cat                                     Simon's Cat      2008  tvSeries      igual         mais de 1 ano
+45804                                         Boat (2007)            11                                                    Boat                                            Boat      2003     video      igual         mais de 1 ano
+26073                 Voyna i mir III. - Borogyino (1967)            10                  War and Peace, Part III: The Year 1812                       Voyna i mir III: 1812 god      1967     movie  diferente                 igual
+32910                                      Wildeye (2015)            10                                             The Midwife                                          Kätilö      2015     movie  diferente                 igual
+47184                           The Vanishing Lady (1896)            10  The Conjuring of a Woman at the House of Robert Houdin  Escamotage d'une dame au théâtre Robert Houdin      1896     short  diferente                 igual
+35985                                  Double-Uuno (1988)             9                                              Tupla-Uuno                                      Tupla-Uuno      1988     movie  diferente                 igual
+51107                                  Сердца трех (1992)             9                                          Serdtsa tryokh                                  Serdtsa tryokh      1992  tvSeries  diferente                 igual
+40623           Circuitry Man II: Plughead Rewired (1994)             9                      Plughead Rewired: Circuitry Man II              Plughead Rewired: Circuitry Man II      1994     movie  diferente                 igual
+49549                       Montparnasse Bienvenüe (2017)             9                                             Jeune Femme                                     Jeune femme      2017     movie  diferente                 igual
+
+=== 7. Referência: concordância se a chave fosse sorteada ===
+Chave verdadeira: 97.7%; chave sorteada (10 sorteios, semente 42): 40.0% ± 0.1
+Fração estimada de chaves erradas em cada grupo = (concordância geral − concordância do grupo) / (geral − sorteada):
+  sem ano no MovieLens: 147 filmes; concordância 91.8%; chaves erradas estimadas: 10%
+  título diferente e ano com mais de 1 ano: 39 filmes; concordância 94.9%; chaves erradas estimadas: 5%
+  título diferente: 2,415 filmes; concordância 97.3%; chaves erradas estimadas: 1%
+  curta: 2,186 filmes; concordância 97.8%; chaves erradas estimadas: 0%
+  série: 453 filmes; concordância 97.1%; chaves erradas estimadas: 1%
+
+Filmes sem ano no MovieLens, por tipo no IMDb (controle):
+          size   mean
+tipo                 
+curta        8  0.875
+episódio     4  1.000
+filme      134  0.918
+série        1  1.000
+
+Filmes sem ano no MovieLens e sem gênero em comum (controle):
+                                                title              genres                                    primaryTitle startYear titleType               genres_imdb  n_avaliacoes
+27843                                        Zone 261              Horror                              Operation Ragnarok      2018     movie       Action,Drama,Sci-Fi             0
+30957                                    The Big Fall              Action                                    The Big Fall      1997     video                     Drama             0
+32880                                    KillerSaurus       Horror|Sci-Fi                                    KillerSaurus      2015     movie   Action,Adventure,Comedy             7
+36241                                 The Frog Prince            Children                                 The Frog Prince      1985     movie      Comedy,Drama,Romance             0
+37508                                  Dhund: The Fog            Thriller                                  Dhund: The Fog      2003     movie  Adventure,Horror,Mystery             1
+43315                                        Exchange              Horror                                       Deep Trap      2015     movie            Crime,Thriller             2
+44462    Science Fiction Volume One: The Osiris Child              Sci-Fi                                The Osiris Child      2016     movie    Action,Adventure,Drama            40
+48892  Bigfoot in Europe: Sasquatch Encounters Abroad  Action|Documentary  Bigfoot in Europe: Sasquatch Encounters Abroad      2015     video                   Mystery             0
+49812                                 Going for Broke         Documentary                                 Going for Broke      2003   tvMovie                     Drama             1
+51767                                        Terminal      Drama|Thriller                                        Terminal      2018     movie       Action,Comedy,Crime            74
+57644                                 Cradle to Grave         Documentary                                 Cradle to Grave      2017   tvMovie                     Drama             1
+61100                            Десять минут первого              Comedy                                           00:10      2009     short            Short,Thriller             3
+
+=== 8. Margem de erro dos gêneros preenchidos pelo IMDb ===
+Filmes preenchidos que entraram depois do ML-20M: 90%
+Controle comparável (movieId > 131,262): 29,412 filmes; concordância 97.01%; chave sorteada 35.37%; sem nenhum gênero em comum: 2.99%
+                      filmes  avaliacoes  concordancia  filmes_controle  chaves_erradas
+ano                                                                                    
+1 ano                    385        1250         0.975             2341           0.039
+igual                   4075       21089         0.970            26550           0.046
+mais de 1 ano            108         284         0.971              379           0.045
+sem ano no MovieLens     254        2598         0.921              139           0.122
+Estimativa de chaves erradas nos preenchidos: 5.0% dos filmes (240 de 4,822) e 5.4% das avaliações (1,359 de 25,221; 0.0054% de todas as 25,000,095)
+Conta simples no controle inteiro, para comparação: (100 − 97.67) / (100 − 40.02) = 3.88%
+
+=== 9. Margem de erro dos anos preenchidos pelo IMDb ===
+Anos preenchidos (filmes sem ano no MovieLens e com ano no IMDb): 409 filmes, 11,747 avaliações
+Controle sem ano no MovieLens: 135 de 147 concordam (91.8%; IC 95% de Wilson 86.3% a 95.3%)
+Chaves erradas estimadas nesse grupo: 13.6% (até 22.9% no limite do IC) → cerca de 56 anos possivelmente errados (até 94)
+
+=== 10. Efeito por usuário ===
+Usuários: 162,541; com pelo menos uma avaliação de filme preenchido: 7,793
+Maior fração das avaliações de um usuário em filmes preenchidos: 10.7%; usuários acima de 5%: 102; acima de 10%: 6
+Efeito esperado no usuário mais exposto: 10.7% × 5.4% = 0.58 ponto percentual das avaliações dele com gênero possivelmente errado
+
+=== 11. Os filmes sem gênero com 50 ou mais avaliações (substitui a conferência manual) ===
+38 filmes; no IMDb: 37; confirmados pela regra (título igual, ano igual ou com 1 ano de diferença, tipo filme): 23; separados: 14, dos quais 13 com gênero do IMDb (4,023 avaliações)
+                                                                             title  n_avaliacoes                                                                primaryTitle startYear    titleType              genres_imdb      titulo                  ano  gênero preenchido
+                                                                   Whiplash (2013)          1030                                                                    Whiplash      2013        short        Drama,Music,Short       igual                igual               True
+                                  Fantastic Beasts and Where to Find Them 2 (2018)           891                                 Fantastic Beasts: The Crimes of Grindelwald      2018        movie Adventure,Family,Fantasy   diferente                igual               True
+                                                                          Paterson           571                                                                    Paterson      2016        movie     Comedy,Drama,Romance       igual sem ano no MovieLens               True
+                                                                      Black Mirror           456                                                                Black Mirror      2011        short                    Short       igual sem ano no MovieLens              False
+                                                                            Cosmos           277                                                                      Cosmos      1980 tvMiniSeries              Documentary       igual sem ano no MovieLens               True
+                                                                            The OA           226                                                                      The OA      2016     tvSeries    Drama,Fantasy,Mystery       igual sem ano no MovieLens               True
+                                                 Death Note: Desu nôto (2006–2007)           192                                                                  Death Note      2006     tvSeries    Animation,Crime,Drama       igual sem ano no MovieLens               True
+                                                       Cosmos: A Spacetime Odissey           191                                                 Cosmos: A Spacetime Odyssey      2014 tvMiniSeries       Documentary,Family quase igual sem ano no MovieLens               True
+                                                                    13 reasons why           190                                                              13 Reasons Why      2017     tvSeries   Drama,Mystery,Thriller       igual sem ano no MovieLens               True
+                               The Adventures of Sherlock Holmes and Doctor Watson           147           The Adventures of Sherlock Holmes and Doctor Watson: Mortal Fight      1980    tvEpisode      Crime,Drama,Mystery     contido sem ano no MovieLens               True
+The Adventures of Sherlock Holmes and Doctor Watson: The Hunt for the Tiger (1980)           103 The Adventures of Sherlock Holmes and Doctor Watson: The Hunt for the Tiger      1980    tvEpisode      Crime,Drama,Mystery       igual                igual               True
+                                                       Ali Wong: Baby Cobra (2016)            90                                                        Ali Wong: Baby Cobra      2016    tvSpecial                   Comedy       igual                igual               True
+                                                       120 Beats Per Minute (2017)            59                                                  120 BPM (Beats Per Minute)      2017        movie                    Drama   diferente                igual               True
+                                                                     Somnio (2016)            56                                                            Infinity Chamber      2016        movie          Sci-Fi,Thriller   diferente                igual               True
+
+Outros filmes do MovieLens com o mesmo título (igual depois de padronizar, ou um é o começo do outro):
+  Whiplash (2013): Whiplash (2014); Whiplash (1948)
+  Fantastic Beasts and Where to Find Them 2 (2018): Fantastic Beasts and Where to Find Them (2016)
+  Paterson: —
+  Black Mirror: Black Mirror: Bandersnatch (2018)
+  Cosmos: Cosmos (2015)
+  The OA: —
+  Death Note: Desu nôto (2006–2007): Death Note (2006); Death Note (2017)
+  Cosmos: A Spacetime Odissey: —
+  13 reasons why: —
+  The Adventures of Sherlock Holmes and Doctor Watson: Adventures of Sherlock Holmes, The (1939); The Adventures of Sherlock Holmes and Doctor Watson: King of Blackmailers (1980); The Adventures of Sherlock Holmes and Doctor Watson: The Hunt for the Tiger (1980)
+  The Adventures of Sherlock Holmes and Doctor Watson: The Hunt for the Tiger (1980): Adventures of Sherlock Holmes, The (1939); The Adventures of Sherlock Holmes and Doctor Watson
+  Ali Wong: Baby Cobra (2016): —
+  120 Beats Per Minute (2017): —
+  Somnio (2016): —
