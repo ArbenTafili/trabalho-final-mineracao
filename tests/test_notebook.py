@@ -65,5 +65,6 @@ def test_executa_inteiro_com_dados_sinteticos(tmp_path_factory):
     assert valores["cópias fundidas (títulos repetidos)"] == "1"  # só a "Cópia Duplicada"; as outras ficam separadas
     assert valores["filmes excluídos (sem gênero)"] not in ("—", "0")
     assert float(valores["diferença máxima da nota após tratamento (p.p.)"]) < 0.5
+    assert valores["grupos do perfil (vetor revisado)"] == "17"  # 19 gêneros, sem IMAX, Animation + Children juntos
     assert valores["filmes com gênero do IMDb"] != "—"
     assert valores["mínimo de avaliadores (kNN)"] != "—"

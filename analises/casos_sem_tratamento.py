@@ -124,3 +124,25 @@ for nome, pop in [("curtas do IMDb", conhecido_k & (filmes_k["titleType"] == "sh
         moda = Y[alvo_k].sum(0).argmax()
         print(f"  {nome}, {a}{'+' if b is None else f'–{b}'} avaliadores: {len(alvo_k):,} filmes; kNN {100 * Y[alvo_k, previsto].mean():.1f}%; "
               f"chutar Drama {100 * Y[alvo_k, drama].mean():.1f}%; chutar o gênero mais comum ({generos_k[moda]}) {100 * Y[alvo_k, moda].mean():.1f}%")
+
+print("\n=== E. Contagem com peso 1/√N, sem o IMAX, nas mesmas populações ===")
+# Regra 1/√N: o gênero previsto é o que o público do filme mais avaliou, com a soma de cada gênero dividida pela raiz
+# do número de filmes desse gênero no catálogo (N), para os gêneros grandes não ganharem sempre. A versão "sem IMAX"
+# tira o menor gênero (formato de exibição, não gênero), que a regra tende a escolher. N vem dos filmes com gênero fora
+# da população testada. Faixas 1–2 e 3–4 incluídas: é onde estão 178 dos 233 filmes excluídos com avaliação.
+sem_imax = np.array([i for i, g in enumerate(generos_k) if g != "IMAX"])
+for nome, pop in [("curtas do IMDb", conhecido_k & (filmes_k["titleType"] == "short").to_numpy()),
+                  ("IMDb só com gêneros que não existem no MovieLens", conhecido_k & so_fora)]:
+    N = np.maximum(Y[conhecido_k & ~pop].sum(0), 1)
+    for a, b in [(1, 2), (3, 4), (5, 9), (10, None), (1, None)]:
+        alvo_k = np.where(pop & (n_k >= a) & (n_k <= (b or np.inf)))[0]
+        if not len(alvo_k):
+            continue
+        peso = S[alvo_k] / np.sqrt(N)
+        com_imax = peso.argmax(1)
+        sem = sem_imax[peso[:, sem_imax].argmax(1)]
+        moda = Y[alvo_k].sum(0).argmax()
+        print(f"  {nome}, {a}{'+' if b is None else f'–{b}'} avaliadores: {len(alvo_k):,} filmes; 1/√N sem IMAX "
+              f"{100 * Y[alvo_k, sem].mean():.1f}% (com IMAX {100 * Y[alvo_k, com_imax].mean():.1f}%; escolhe IMAX em "
+              f"{100 * (com_imax == generos_k.index('IMAX')).mean():.0f}%); chutar o gênero mais comum ({generos_k[moda]}) "
+              f"{100 * Y[alvo_k, moda].mean():.1f}%; chutar Drama {100 * Y[alvo_k, drama].mean():.1f}%")

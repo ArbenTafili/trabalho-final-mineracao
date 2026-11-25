@@ -132,7 +132,7 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 ## D4 — Filmes sem ano no título e gêneros raros
 
-**Status:** aprovada com ajustes em 18/11/2026; ano preenchido pelo IMDb na v6; teste de sensibilidade do corte de 2% com War ainda não feito. Arquivo do IMDb baixado em 18/11/2026 (MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`). O IMDb tem ano para 409 dos 412 filmes sem ano. Nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0% (`analises/resultados_imdb.txt`).
+**Status:** aprovada com ajustes em 18/11/2026; ano preenchido pelo IMDb na v6; teste de sensibilidade do corte de 2% feito na v8 (3.8-a): com 1,5%, só War muda de lado; com 2,5%, só Mystery; o limite fica em 2%. Musical (1,25%) fica em `raros`, e o agrupamento é feito só no vetor revisado, não no pré-processamento. Arquivo do IMDb baixado em 18/11/2026 (MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`). O IMDb tem ano para 409 dos 412 filmes sem ano. Nos 61.880 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0% (`analises/resultados_imdb.txt`).
 
 **Fatos medidos:** 412 filmes sem ano no título (11.749 avaliações; 264 deles também sem gênero), incluindo Ready Player One e Moonlight.
 
@@ -148,11 +148,25 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 ## D5 — Gêneros parecidos (sobreposição)
 
-**Status:** proposta, aguardando aprovação do aluno para ir à mesa.
+**Status:** aprovada pelo aluno em 25/11/2026 ("faz sentido isso do perfil ter o Animation e Children"; IMAX fora: "as duas") e pela mesa de 7 (2 aprovam, 5 aprovam com ajuste); implementada na v8 (25/11/2026).
 
 **Fatos medidos:** dos 195 filmes IMAX, só 1 não tem outro gênero; nas avaliações, 63% dos IMAX também são Action, 60% Adventure e 45% Sci-Fi. Animation × Children é o par mais sobreposto: Jaccard 0,21 nos filmes, 78% das avaliações de Animation também são Children, correlação 0,82 entre usuários (3.2).
 
 **Proposta:** IMAX sai do vetor do perfil (é formato de exibição, não gênero); Animation e Children viram um grupo só no vetor; os rótulos continuam nos dados.
+
+**Votação (25/11/2026).** A proposta foi à mesa só para o vetor revisado (3.8): IMAX fora; Animation e Children num grupo `Animation/Children`; k = número de grupos distintos do filme; limite de 2% aplicado aos 17 grupos. Ficaram de fora: juntar também no vetor base (o base fica como representação fiel e comparação) e renomear Children para Family (Family é o rótulo do IMDb e concorda só de 53% a 62% com Children). Votos: 2 aprovam (prof. de Banco de Dados e cientista de dados) e 5 aprovam com ajuste. Ajustes:
+1. registrar os números esperados antes da execução (abaixo);
+2. declarar que a decisão é de taxonomia, não de redundância (correlação de 0,82, abaixo do limiar de 0,9 da 3.2), e que vale qualquer que seja o resultado da 3.8-b; mostrar a v7 e a v8 lado a lado, só para transparência;
+3. informar a sobreposição nos dois sentidos (77,7% das avaliações de Animation são de filmes também Children; 59,6% no sentido contrário) e que o grupo fica com cerca de 3,33%, não 4,03%: contado uma vez só por filme, ele passa 0,70 ponto aos gêneros que aparecem junto;
+4. sensibilidade do limite (fecha a pendência da D4): imprimir o destino de cada grupo com 1,5%, 2% e 2,5%;
+5. uma constante única de agrupamento, k por grupos distintos, coluna `frac_animation_children`, `assert` de 17 grupos e de soma 1;
+6. testes dos quatro casos de borda ("Action|IMAX", só IMAX, "Animation|Children|Comedy", só "Animation");
+7. exemplo calculado na 3.8-a (Toy Story e Avatar);
+8. fechar a D5, a decisão 24 e as pendências da D4 (agrupamento só no vetor; Musical em `raros`; teste com War feito).
+
+**Números esperados, registrados antes da execução v8** (conta da mesa sobre os dados reais, sem as fusões da D3, cujo efeito é desprezível): 17 grupos; Animation/Children perto de 3,33%; 12 grupos mantidos (Drama 20,80%, Comedy 17,06%, Action 9,60%, Thriller 9,19%, Adventure 7,33%, Romance 6,77%, Crime 5,78%, Sci-Fi 5,74%, Fantasy 3,46%, Animation/Children 3,33%, Horror 3,17%, Mystery 2,49%); `raros` com War 1,81%, Musical 1,25%, Documentary 1,11%, Western 0,80% e Film-Noir 0,30% (cerca de 5,27%); vetor revisado com 20 atributos; 1 filme só com IMAX (movieId 4460, Encounter in the Third Dimension, 27 avaliações); com o limite em 1,5%, só War muda; em 2,5%, só Mystery. A seção 1 até a 3.7 (vetor base) não muda.
+
+**Implementação (v8, 25/11/2026).** Só a célula 3.8-a mudou: constante única `GRUPO_DO_GENERO`, k = número de grupos distintos do filme, coluna `frac_animation_children`, `assert` de 17 grupos e de soma 1, os quatro casos de borda testados em `pesos_do_filme` dentro do notebook, a sobreposição nos dois sentidos, o exemplo calculado (Toy Story e Avatar, conferido contra o cálculo do Spark) e a tabela de sensibilidade do limite. Novo número de controle: grupos do perfil. Na execução com os dados reais no Mac, os números esperados bateram: 17 grupos; Animation/Children com 3,34%; 12 grupos mantidos; `raros` com War, Musical, Documentary, Western e Film-Noir (5,27%); 1 filme só com IMAX (27 avaliações); com 1,5% só War muda e com 2,5% só Mystery. Sobreposição: 77,6% e 59,6% (a mesa tinha 77,7%, sem as fusões da D3); Jaccard 0,213. Efeito no vetor revisado: o PCA passa a ter d′ = 7 (73,94% da variância; na v7, 6 e 69,13%); atípicos 1.171 (v7: 1.078; vetor base: 1.293); Hopkins robusto 0,68; diversidade de gêneros normalizada por log(17). A seção 1 até a 3.7 não mudou. No Colab (25/11/2026, das 11:18 às 11:50, em segundo plano com `jupyter nbconvert`), os 22 números de controle saíram idênticos aos do Mac.
 
 ## D6 — Excluir o que não tem tratamento automático (proposta 3)
 
@@ -200,5 +214,5 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 
 ## Pendências do aluno
 
-- Aprovação da D5 para ir à mesa.
-- Decisão sobre Musical e gêneros raros (agrupar só no vetor ou já no pré-processamento), junto com o teste de sensibilidade do corte de 2% com War (D4).
+- Validar o limiar de nota positiva (4,0). Ele só define `prop_positivas`, que já está fora da entrada de P1 (redundante com `nota_media`, 3.2); só volta a importar se esse atributo voltar.
+- Próximas etapas: P1 e P2 (anotações do aluno em `docs/anotacoes_futuro.md`).

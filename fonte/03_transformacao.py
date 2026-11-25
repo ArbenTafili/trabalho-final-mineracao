@@ -581,8 +581,9 @@ plt.show()
 #
 # O vetor revisado mantém a lógica de proporções com denominador explícito e acrescenta:
 #
-# - **proporção fracionária:** cada avaliação distribui peso 1/k entre os k gêneros do filme, e o vetor de gêneros soma 1;
-# - **limite de gêneros:** gêneros com menos de 2% das avaliações formam o grupo `raros`;
+# - **grupos do perfil:** o IMAX sai, porque é formato de exibição, e não gênero (quase todo filme IMAX tem outro gênero); Animation e Children formam um grupo só, `Animation/Children`, porque têm o mesmo público em grande parte. Os rótulos dos dados não mudam: a junção vale só neste vetor;
+# - **proporção fracionária:** cada avaliação distribui peso 1/k entre os k grupos do filme, e o vetor de gêneros soma 1;
+# - **limite de gêneros:** grupos com menos de 2% das avaliações formam o grupo `raros`;
 # - **atributos derivados:** viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes avaliados, e diversidade de gêneros (entropia normalizada);
 # - **gênero dominante:** atributo categórico, usado só para descrever.
 #
@@ -595,9 +596,8 @@ LIMITE_GENERO = 0.02  # gêneros com menos de 2% das avaliações (contagem frac
 filmes_info = (ratings_clean.groupBy("movieId").agg(F.count("*").alias("n_filme"), F.avg("rating").alias("media_filme"))
     .join(movies_clean.select("movieId", "genres", "ano"), "movieId")
     .withColumn("ano_lancamento", F.col("ano").cast("double"))  # ano do título ou, sem ele, do IMDb (2.2-b)
-    .withColumn("n_generos_filme", F.size(F.split(F.col("genres"), r"\|")))
     .withColumn("log_n_filme", F.log10(F.col("n_filme")))
-    .select("movieId", "media_filme", "ano_lancamento", "n_generos_filme", "log_n_filme")
+    .select("movieId", "n_filme", "media_filme", "ano_lancamento", "log_n_filme")
     .cache())
 derivados_pd = (ratings_clean.select("userId", "movieId", "rating")
     .join(F.broadcast(filmes_info), "movieId")
@@ -606,36 +606,98 @@ derivados_pd = (ratings_clean.select("userId", "movieId", "rating")
         F.avg("log_n_filme").alias("popularidade_media"),
         F.avg("ano_lancamento").alias("ano_medio_lancamento"))
     .toPandas())
-# Proporção fracionária: cada avaliação distribui peso 1/k entre os k gêneros do filme; o vetor de gêneros soma 1.
-frac_pd = (ratings_genres.select("userId", "movieId", "genre")
-    .join(F.broadcast(filmes_info.select("movieId", "n_generos_filme")), "movieId")
-    .groupBy("userId").pivot("genre", lista_generos).agg(F.sum(1.0 / F.col("n_generos_filme")))
+# Grupos do perfil (decisão D5): IMAX é formato de exibição, não gênero, e sai; Animation e Children viram um grupo só.
+GRUPO_DO_GENERO = {"IMAX": None, "Animation": "Animation/Children", "Children": "Animation/Children"}
+grupo_do = lambda g: GRUPO_DO_GENERO.get(g, g)
+grupos_perfil = sorted({grupo_do(g) for g in lista_generos} - {None})
+coluna_grupo = {gr: "frac_" + gr.lower().replace("-", "_").replace("/", "_") for gr in grupos_perfil}
+mapa_grupo = spark.createDataFrame([(g, grupo_do(g)) for g in lista_generos if grupo_do(g)], ["genre", "grupo"])
+filme_grupo = movie_genres.select("movieId", "genre").join(F.broadcast(mapa_grupo), "genre").select("movieId", "grupo").distinct()
+grupos_por_filme = filme_grupo.groupBy("movieId").agg(F.count("*").alias("n_grupos_filme"))
+filme_grupo = filme_grupo.join(grupos_por_filme, "movieId").cache()
+so_imax = movies_clean.join(grupos_por_filme, "movieId", "left_anti").select("movieId")
+n_so_imax = so_imax.count()
+aval_so_imax = ratings_clean.join(F.broadcast(so_imax), "movieId").count()
+assert len(grupos_perfil) == len(lista_generos) - 2 and not any("/" in c for c in coluna_grupo.values())
+print(f"Grupos do perfil: {len(grupos_perfil)} (os {len(lista_generos)} gêneros, sem IMAX, com Animation e Children juntos)")
+print(f"Filmes que só têm IMAX: {n_so_imax}, com {aval_so_imax:,} avaliações; essas avaliações não entram nas proporções de gênero")
+
+
+def pesos_do_filme(generos):
+    """Regra conferível à mão: cada avaliação do filme distribui peso 1/k entre os k grupos distintos do filme."""
+    grupos = sorted({grupo_do(g) for g in generos.split("|")} - {None})
+    return {gr: 1 / len(grupos) for gr in grupos}
+
+
+assert pesos_do_filme("Action|IMAX") == {"Action": 1.0}
+assert pesos_do_filme("IMAX") == {}
+assert pesos_do_filme("Animation|Children|Comedy") == {"Animation/Children": 0.5, "Comedy": 0.5}
+assert pesos_do_filme("Animation") == {"Animation/Children": 1.0}
+
+# Sobreposição de Animation e Children, nos dois sentidos (avaliações) e nos filmes (Jaccard).
+flags = (movie_genres.filter(F.col("genre").isin("Animation", "Children"))
+         .groupBy("movieId").agg(F.collect_set("genre").alias("gs"))
+         .join(filmes_info.select("movieId", "n_filme"), "movieId", "left").fillna({"n_filme": 0}).toPandas())
+tem_a, tem_c = flags["gs"].map(lambda s: "Animation" in s), flags["gs"].map(lambda s: "Children" in s)
+print(f"Avaliações de Animation em filmes também Children: {100 * flags.loc[tem_a & tem_c, 'n_filme'].sum() / flags.loc[tem_a, 'n_filme'].sum():.1f}%; "
+      f"de Children em filmes também Animation: {100 * flags.loc[tem_a & tem_c, 'n_filme'].sum() / flags.loc[tem_c, 'n_filme'].sum():.1f}%; "
+      f"Jaccard nos filmes: {(tem_a & tem_c).sum() / (tem_a | tem_c).sum():.3f}")
+
+# Exemplo calculado: um filme com Animation e Children e um com IMAX (Toy Story e Avatar, se estiverem no catálogo).
+catalogo_ex = (movies_clean.select("movieId", "title", "genres").join(filmes_info.select("movieId", "n_filme"), "movieId")
+               .orderBy(F.desc("n_filme"), "movieId").toPandas())
+exemplos = []
+for titulo, condicao in [("Toy Story (1995)", lambda s: "Animation" in s and "Children" in s),
+                         ("Avatar (2009)", lambda s: "IMAX" in s and "|" in s)]:
+    achados = catalogo_ex[catalogo_ex["title"] == titulo]
+    exemplos.append(achados.iloc[0] if len(achados) else catalogo_ex[catalogo_ex["genres"].map(condicao)].iloc[0])
+pesos_spark = filme_grupo.filter(F.col("movieId").isin([int(e["movieId"]) for e in exemplos])).toPandas()
+print("\nExemplo calculado (peso de cada avaliação do filme):")
+for e in exemplos:
+    generos = e["genres"].split("|")
+    v8 = pesos_do_filme(e["genres"])
+    no_spark = pesos_spark[pesos_spark["movieId"] == e["movieId"]]
+    assert set(no_spark["grupo"]) == set(v8) and np.allclose(1 / no_spark["n_grupos_filme"], 1 / len(v8))
+    print(f"  {e['title']} ({e['genres']}): v7, por gênero: 1/{len(generos)} para cada um; "
+          f"v8, por grupo: " + ", ".join(f"{gr} 1/{len(v8)}" for gr in v8))
+
+# Proporção fracionária: cada avaliação distribui peso 1/k entre os k grupos do filme; o vetor de gêneros soma 1.
+frac_pd = (ratings_clean.select("userId", "movieId")
+    .join(F.broadcast(filme_grupo), "movieId")
+    .groupBy("userId").pivot("grupo", grupos_perfil).agg(F.sum(1.0 / F.col("n_grupos_filme")))
     .toPandas().fillna(0.0)
-    .rename(columns={g: "frac_" + sufixo[g] for g in lista_generos}))
-cols_frac = ["frac_" + sufixo[g] for g in lista_generos]
+    .rename(columns=coluna_grupo))
+cols_frac = [coluna_grupo[gr] for gr in grupos_perfil]
+massa_genero = frac_pd[cols_frac].sum() / frac_pd[cols_frac].sum().sum()  # participação de cada grupo nas avaliações
 perfil_rev_pd = (perfil_pd[["userId", "n_avaliacoes", "nota_media", "nota_dp", "atipico"]]
                  .merge(derivados_pd, on="userId", how="left").merge(frac_pd, on="userId", how="left"))
 assert len(perfil_rev_pd) == len(perfil_pd)
 assert (perfil_rev_pd["userId"].to_numpy() == perfil_pd["userId"].to_numpy()).all()
 perfil_rev_pd.index = perfil_pd.index
-perfil_rev_pd[cols_frac] = perfil_rev_pd[cols_frac].div(perfil_rev_pd["n_avaliacoes"], axis=0)
+peso_total = perfil_rev_pd[cols_frac].sum(axis=1)  # = avaliações do usuário menos as de filmes que só têm IMAX
+assert (peso_total > 0).all()
+perfil_rev_pd[cols_frac] = perfil_rev_pd[cols_frac].div(peso_total, axis=0)
 assert np.allclose(perfil_rev_pd[cols_frac].sum(axis=1), 1.0, atol=1e-9)
 
-# Limite de gêneros: participação de cada gênero no total de avaliações, com contagem fracionária.
-massa_genero = (perfil_rev_pd[cols_frac].mul(perfil_rev_pd["n_avaliacoes"], axis=0).sum()
-                / perfil_rev_pd["n_avaliacoes"].sum())
-destino = {g: ("fora: falta de gênero, não preferência" if g == "Unknown"
-               else "mantido" if massa_genero["frac_" + sufixo[g]] >= LIMITE_GENERO else "agrupado em raros")
-           for g in lista_generos}
-tabela_generos = (pd.DataFrame({"gênero": lista_generos,
-                                "participação_%": [100 * massa_genero["frac_" + sufixo[g]] for g in lista_generos],
-                                "destino": [destino[g] for g in lista_generos]})
+# Limite de gêneros: participação de cada grupo no total de avaliações, com contagem fracionária.
+destino_com = lambda limite: {gr: "mantido" if massa_genero[coluna_grupo[gr]] >= limite else "agrupado em raros"
+                               for gr in grupos_perfil}
+destino = destino_com(LIMITE_GENERO)
+tabela_generos = (pd.DataFrame({"grupo": grupos_perfil,
+                                "participação_%": [100 * massa_genero[coluna_grupo[gr]] for gr in grupos_perfil],
+                                "destino": [destino[gr] for gr in grupos_perfil],
+                                **{f"com limite de {lim:.1%}".replace(".", ","): [destino_com(lim)[gr] for gr in grupos_perfil]
+                                   for lim in (0.015, 0.025)}})
                   .sort_values("participação_%", ascending=False))
-print(f"Participação de cada gênero nas avaliações (contagem fracionária; limite = {100 * LIMITE_GENERO:.0f}%):")
+print(f"\nParticipação de cada grupo nas avaliações (contagem fracionária; limite = {100 * LIMITE_GENERO:.0f}%; "
+      "sensibilidade com 1,5% e 2,5%):")
 print(tabela_generos.round(3).to_string(index=False))
-generos_mantidos = [g for g in lista_generos if destino[g] == "mantido"]
-generos_raros = [g for g in lista_generos if destino[g] == "agrupado em raros"]
-perfil_rev_pd["frac_raros"] = perfil_rev_pd[["frac_" + sufixo[g] for g in generos_raros]].sum(axis=1)
+for lim in (0.015, 0.025):
+    mudam = [gr for gr in grupos_perfil if destino_com(lim)[gr] != destino[gr]]
+    print(f"Com limite de {100 * lim:.1f}%: mudam de lado {mudam if mudam else 'nenhum'}".replace(".", ",", 1))
+generos_mantidos = [gr for gr in grupos_perfil if destino[gr] == "mantido"]
+generos_raros = [gr for gr in grupos_perfil if destino[gr] == "agrupado em raros"]
+perfil_rev_pd["frac_raros"] = perfil_rev_pd[[coluna_grupo[gr] for gr in generos_raros]].sum(axis=1)
 
 # Atributos derivados.
 perfil_rev_pd["atividade_log"] = np.log10(perfil_rev_pd["n_avaliacoes"])
@@ -647,12 +709,12 @@ sem_ano = perfil_rev_pd["ano_medio_lancamento"].isna()
 print(f"\nUsuários sem nenhum filme com ano no título: {int(sem_ano.sum())}")
 if sem_ano.any():
     perfil_rev_pd.loc[sem_ano, "ano_medio_lancamento"] = perfil_rev_pd["ano_medio_lancamento"].median()
-perfil_rev_pd["genero_dominante"] = (perfil_rev_pd[["frac_" + sufixo[g] for g in generos_mantidos] + ["frac_raros"]]
+perfil_rev_pd["genero_dominante"] = (perfil_rev_pd[[coluna_grupo[gr] for gr in generos_mantidos] + ["frac_raros"]]
                                      .idxmax(axis=1).str.replace("frac_", "", regex=False))
 
 ATRIBUTOS_DERIVADOS = ["vies_usuario", "atividade_log", "popularidade_media", "ano_medio_lancamento", "diversidade_generos"]
 candidatos_rev = (["nota_media", "nota_dp"] + ATRIBUTOS_DERIVADOS
-                  + ["frac_" + sufixo[g] for g in generos_mantidos] + ["frac_raros"])
+                  + [coluna_grupo[gr] for gr in generos_mantidos] + ["frac_raros"])
 print("\nAtributos derivados (por usuário):")
 print("  vies_usuario = média de (nota do usuário − média do filme): rigor do usuário sem o efeito dos filmes escolhidos")
 print("  atividade_log = log10(avaliações do usuário); popularidade_media = média de log10(avaliações dos filmes avaliados)")
@@ -705,18 +767,22 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Participação fracionária dos gêneros:** Drama 20,7%, Comedy 16,8%, Action 9,4%, Thriller 9,1%, Adventure 6,9% e Romance 6,7% lideram. Doze gêneros ficam acima do limite de 2%.
-# - **Gêneros raros:** War, Animation, Musical, Documentary, IMAX, Western e Film-Noir somam 7,85% das avaliações e formam o grupo `raros`. `Unknown` já não existe: os filmes sem gênero foram excluídos em 2.2-d.
+# - **Grupos do perfil:** 17 grupos (os 19 gêneros, sem IMAX e com Animation e Children juntos). Participação fracionária: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3% e Romance 6,8% lideram. Doze grupos ficam acima do limite de 2%.
+# - **Animation/Children:** com 3,34%, o grupo fica acima do limite. Na v7, Animation (1,66%) caía em `raros`, junto com Film-Noir e Documentary, e Children (2,38%) ficava sozinho. O grupo tem menos que a soma dos dois (4,03%): contado uma vez só por filme, ele passa a outros gêneros o peso que antes ia duas vezes para o mesmo público. No exemplo, cada avaliação de Toy Story dava 1/5 a cada um dos 5 gêneros e passa a dar 1/4 a cada um dos 4 grupos.
+# - **Sobreposição:** 77,6% das avaliações de Animation são de filmes também Children, mas só 59,6% das de Children são de filmes também Animation, e o Jaccard nos filmes é 0,21. Os dois não são equivalentes, e a correlação entre usuários (0,82 na 3.2) fica abaixo do limiar de redundância. A junção é uma escolha de taxonomia: o grupo descreve o público de animação e infantil.
+# - **IMAX:** sai do perfil, porque é formato de exibição. A fração dele vai para os outros gêneros do filme (Avatar: de 1/4 para 1/3 em Action, Adventure e Sci-Fi). Só 1 filme tem apenas IMAX, com 27 avaliações, que ficam fora das proporções.
+# - **Gêneros raros:** War, Musical, Documentary, Western e Film-Noir somam 5,27% das avaliações e formam o grupo `raros`.
+# - **Sensibilidade do limite:** com 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`). Nenhum outro grupo muda entre 1,5% e 2,5%, e o limite fica em 2%.
 # - **Atributos derivados:**
 #   - viés do usuário: média 0,08 e DP 0,44 (de −3,42 a 2,44). Em média, os usuários dão notas próximas da média de cada filme, mas alguns são sistematicamente rigorosos ou generosos;
 #   - atividade em log: média 1,92 (cerca de 83 avaliações), DP 0,44;
 #   - popularidade média: 4,04, ou seja, o filme típico visto por um usuário tem cerca de 11 mil avaliações;
 #   - ano médio dos filmes vistos: 1994, com DP de 7,3 anos;
-#   - diversidade de gêneros: 0,79, com DP 0,06.
+#   - diversidade de gêneros: 0,80, com DP 0,06.
 # - **Redundância:** o par mais associado é nota média × viés do usuário (Pearson 0,903; Spearman 0,881). Como só um dos dois critérios passa de 0,9, os dois ficam. Nenhum atributo foi removido, e o vetor revisado tem 20 atributos.
-# - **Gênero dominante:** Drama em 54,3% dos usuários, Comedy em 27,9% e Action em 8,0%.
+# - **Gênero dominante:** Drama em 54,3% dos usuários, Comedy em 28,0% e Action em 8,2%.
 #
-# **Limitação:** o limite de 2% é uma escolha registrada. Animation (1,66%) ficou em `raros`, mas o público infantil continua representado por Children (2,4%).
+# **Limitação:** o limite de 2% e os grupos são escolhas registradas. A animação adulta (anime, por exemplo) entra no grupo de animação e infantil, porque só 21% dos filmes têm os dois gêneros; os rótulos dos dados continuam separados.
 
 # %% [markdown]
 # #### Comparação entre o vetor base e o vetor revisado
@@ -812,20 +878,22 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **PCA do vetor revisado:** 6 componentes por Kaiser-Guttman retêm 69,13% da variância, contra 66,84% com os mesmos 6 componentes no vetor base. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos.
+# - **PCA do vetor revisado:** 7 componentes por Kaiser-Guttman retêm 73,94% da variância, contra 66,84% com 6 componentes no vetor base. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos.
 # - **Componentes:**
-#   - CP1 (20,8%): ação, aventura e ficção contra romance;
-#   - CP2 (15,1%): infantil e fantasia contra crime e suspense;
-#   - CP3 (11,5%): nota média e viés do usuário;
-#   - CP4 (8,6%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
-#   - CP5: gêneros raros e horror;
-#   - CP6: ano médio dos filmes vistos.
-# - **Distâncias:** no espaço PCA, o contraste relativo cai de 110,66 para 59,81 e a variância relativa, de 0,426 para 0,377: as distâncias ficam um pouco mais concentradas no vetor revisado. O contraste relativo depende só do par mais próximo e do mais distante da amostra, por isso oscila mais; a variância relativa usa todos os pares.
-# - **Dimensionalidade intrínseca:** 6,4 no PCA revisado e 12,0 no z revisado, contra 6,4 e 13,2 no vetor base.
-# - **Atípicos:** 1.078 no vetor revisado, contra 1.293 no base (−17%). Só 379 são atípicos nos dois (Jaccard 0,19). No vetor revisado, os atípicos se concentram em horror (336 usuários).
+#   - CP1 (20,9%): ação, aventura e ficção contra romance;
+#   - CP2 (14,7%): crime e suspense contra animação/infantil e fantasia;
+#   - CP3 (11,7%): nota média e viés do usuário;
+#   - CP4 (8,4%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
+#   - CP5 (7,6%): gêneros raros, em usuários que veem filmes mais antigos;
+#   - CP6 (5,7%): ano médio dos filmes vistos;
+#   - CP7 (5,0%): atividade e comédia contra mistério e horror.
+# - **Distâncias:** no espaço PCA, o contraste relativo cai de 110,66 para 45,18 e a variância relativa, de 0,426 para 0,369: as distâncias ficam um pouco mais concentradas no vetor revisado. O contraste relativo depende só do par mais próximo e do mais distante da amostra, por isso oscila mais; a variância relativa usa todos os pares.
+# - **Dimensionalidade intrínseca:** 7,2 no PCA revisado e 12,0 no z revisado, contra 6,4 e 13,2 no vetor base.
+# - **Atípicos:** 1.171 no vetor revisado, contra 1.293 no base (−9%). Só 412 são atípicos nos dois (Jaccard 0,20). No vetor revisado, os atípicos se concentram em horror (327 usuários).
 # - **Hopkins (domínio robusto):** 0,68 no PCA revisado e 0,77 no z revisado, contra 0,70 e 0,77 no base. A tendência de agrupamento continua moderada.
+# - **Antes e depois dos grupos do perfil (transparência):** sem os grupos (v7), o PCA revisado tinha 6 componentes (69,13% da variância), 1.078 atípicos e Hopkins de 0,68. Com IMAX fora e Animation/Children juntos, passa a 7 componentes (73,94%), 1.171 atípicos e o mesmo Hopkins. A decisão dos grupos é de taxonomia e não depende desta comparação.
 #
-# **Interpretação:** com o mesmo número de componentes, o vetor revisado guarda mais variância, gera menos atípicos e acrescenta eixos interpretáveis (atividade, popularidade e época). As distâncias ficam um pouco mais concentradas, e a tendência de agrupamento fica próxima da do vetor base.
+# **Interpretação:** o vetor revisado guarda mais variância, gera menos atípicos e acrescenta eixos interpretáveis (atividade, popularidade e época), ao custo de um componente a mais. As distâncias ficam um pouco mais concentradas, e a tendência de agrupamento fica próxima da do vetor base.
 #
 # **Consequência:** o PCA do vetor revisado passa a ser a entrada principal de P1, pelos ganhos de representação: proporções que somam 1, sem contagem dupla de gêneros, com atividade e popularidade. O vetor base fica como comparação, também para medir o efeito da concentração de distâncias um pouco maior.
 
@@ -961,10 +1029,10 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Espaços PCA (6 dimensões):** a kd-tree é o índice exato mais rápido: 0,12 s para 1.000 buscas kNN no PCA revisado, contra 0,94 s da varredura linear. A ball-tree não ganha da varredura.
-# - **Espaços z (20 ou 21 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 8,1 a 10,8 s; ball-tree 16,2 a 20,9 s; varredura 1,0 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
-# - **HNSW:** 1.000 buscas em 0,018 a 0,044 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (7,5 a 14,3 s).
-# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias nos dois espaços PCA, contra 92,6% (z revisado) e 89,2% (z base). Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, cerca de 60% contra 46%.
+# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,20 s para 1.000 buscas kNN no PCA revisado, contra 0,73 s da varredura linear. A ball-tree não ganha da varredura.
+# - **Espaços z (20 ou 21 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 6,2 a 9,9 s; ball-tree 14,8 a 18,2 s; varredura 0,9 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
+# - **HNSW:** 1.000 buscas em 0,017 a 0,029 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (6,8 a 12,7 s).
+# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA base e 99,8% no PCA revisado, contra 92,2% (z revisado) e 89,2% (z base). Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, cerca de 59% contra 46%.
 #
 # **Limitação:** os tempos dependem da máquina (Colab gratuito); a fração de distâncias evitadas não.
 #
@@ -980,9 +1048,9 @@ plt.show()
 # | `X_p1_minmax` | os mesmos 21 atributos em [0, 1] | alternativa de escala |
 # | `X_p1_pca` | 6 componentes principais (critério de Kaiser-Guttman, 66,84%) | entrada candidata com dimensionalidade reduzida |
 # | `perfil_pd["atipico"]` | 1.293 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
-# | `perfil_rev_pd` | atributos derivados, proporções fracionárias, gênero dominante e `atipico_rev` (1.078 usuários) | descrever os grupos do vetor revisado |
+# | `perfil_rev_pd` | atributos derivados, proporções fracionárias, gênero dominante e `atipico_rev` (1.171 usuários) | descrever os grupos do vetor revisado |
 # | `X_rev_padronizado` | 20 atributos do vetor revisado, z-score | entrada alternativa interpretável |
-# | `X_rev_pca` | 6 componentes do vetor revisado (Kaiser-Guttman, 69,13%) | **entrada principal de P1** |
+# | `X_rev_pca` | 7 componentes do vetor revisado (Kaiser-Guttman, 73,94%) | **entrada principal de P1** |
 #
 # **Resultados desta execução:**
 #
@@ -1008,7 +1076,7 @@ plt.show()
 # - **Dimensionalidade intrínseca:** cerca de 13 no espaço z de 21 atributos. As projeções 2D mostram uma nuvem contínua, sem grupos isolados.
 # - **Valores atípicos:** 1.293 usuários (0,80%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Documentary, Film-Noir, Western e War). Foram mantidos e marcados.
 # - **Tendência de agrupamento:** estatística de Hopkins de 0,705 (PCA) e 0,767 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
-# - **Vetor revisado (3.8):** proporções fracionárias, gêneros raros agrupados, sem contagem dupla e com cinco atributos derivados. Com os mesmos 6 componentes, retém mais variância (69,13% contra 66,84%), tem 17% menos atípicos (1.078) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
-# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,12 s (varredura: 0,94 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
+# - **Vetor revisado (3.8):** proporções fracionárias, IMAX fora, Animation e Children num grupo só, gêneros raros agrupados, sem contagem dupla e com cinco atributos derivados. Retém 73,94% da variância em 7 componentes (o base, 66,84% em 6), tem 9% menos atípicos (1.171) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
+# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,20 s (varredura: 0,73 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
 #
-# **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Com o mesmo número de componentes, ele guarda mais variância, gera menos atípicos e não depende da contagem dupla de gêneros. O PCA do vetor base e as matrizes z-score ficam como comparação. As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.
+# **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda mais variância, gera menos atípicos, não depende da contagem dupla de gêneros e trata animação e infantil como um público só. O PCA do vetor base e as matrizes z-score ficam como comparação. As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.

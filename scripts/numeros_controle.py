@@ -34,6 +34,7 @@ CONTROLES = [
     ("variância retida PCA base (%)", r"Matriz candidata no espaço PCA: \(\d+, \d+\); variância retida = ([\d.]+)%"),
     ("usuários atípicos", r"Atípicos \(b e c ao mesmo tempo\): ([\d,]+) usuários"),
     ("Hopkins PCA (percentis 1–99)", r"PCA \(\d+\)\s+todos\s+percentis 1–99\s+\d+\s+([\d.]+)"),
+    ("grupos do perfil (vetor revisado)", r"Grupos do perfil: (\d+)"),
     ("variância retida PCA revisado (%)", r"PCA do vetor revisado: d′ = \d+ \(Kaiser-Guttman, ([\d.]+)%"),
 ]
 

@@ -95,3 +95,15 @@ Tipo no IMDb dos filmes de A com 5 ou mais avaliadores: {'short': 46, 'código a
   IMDb só com gêneros que não existem no MovieLens, 5–9 avaliadores: 23 filmes; kNN 34.8%; chutar Drama 21.7%; chutar o gênero mais comum (Documentary) 52.2%
   IMDb só com gêneros que não existem no MovieLens, 10–49 avaliadores: 12 filmes; kNN 58.3%; chutar Drama 50.0%; chutar o gênero mais comum (Documentary) 50.0%
   IMDb só com gêneros que não existem no MovieLens, 5+ avaliadores: 37 filmes; kNN 45.9%; chutar Drama 32.4%; chutar o gênero mais comum (Documentary) 51.4%
+
+=== E. Contagem com peso 1/√N, sem o IMAX, nas mesmas populações ===
+  curtas do IMDb, 1–2 avaliadores: 588 filmes; 1/√N sem IMAX 35.2% (com IMAX 34.2%; escolhe IMAX em 11%); chutar o gênero mais comum (Animation) 37.2%; chutar Drama 20.7%
+  curtas do IMDb, 3–4 avaliadores: 440 filmes; 1/√N sem IMAX 48.6% (com IMAX 47.3%; escolhe IMAX em 4%); chutar o gênero mais comum (Animation) 57.5%; chutar Drama 12.5%
+  curtas do IMDb, 5–9 avaliadores: 524 filmes; 1/√N sem IMAX 31.5% (com IMAX 30.5%; escolhe IMAX em 3%); chutar o gênero mais comum (Animation) 53.1%; chutar Drama 13.2%
+  curtas do IMDb, 10+ avaliadores: 576 filmes; 1/√N sem IMAX 22.0% (com IMAX 19.6%; escolhe IMAX em 9%); chutar o gênero mais comum (Animation) 52.4%; chutar Drama 16.3%
+  curtas do IMDb, 1+ avaliadores: 2,128 filmes; 1/√N sem IMAX 33.5% (com IMAX 32.0%; escolhe IMAX em 7%); chutar o gênero mais comum (Animation) 49.4%; chutar Drama 16.0%
+  IMDb só com gêneros que não existem no MovieLens, 1–2 avaliadores: 68 filmes; 1/√N sem IMAX 26.5% (com IMAX 25.0%; escolhe IMAX em 10%); chutar o gênero mais comum (Documentary) 39.7%; chutar Drama 39.7%
+  IMDb só com gêneros que não existem no MovieLens, 3–4 avaliadores: 14 filmes; 1/√N sem IMAX 35.7% (com IMAX 35.7%; escolhe IMAX em 7%); chutar o gênero mais comum (Drama) 42.9%; chutar Drama 42.9%
+  IMDb só com gêneros que não existem no MovieLens, 5–9 avaliadores: 23 filmes; 1/√N sem IMAX 17.4% (com IMAX 17.4%; escolhe IMAX em 0%); chutar o gênero mais comum (Documentary) 52.2%; chutar Drama 21.7%
+  IMDb só com gêneros que não existem no MovieLens, 10+ avaliadores: 14 filmes; 1/√N sem IMAX 42.9% (com IMAX 42.9%; escolhe IMAX em 7%); chutar o gênero mais comum (Documentary) 50.0%; chutar Drama 50.0%
+  IMDb só com gêneros que não existem no MovieLens, 1+ avaliadores: 119 filmes; 1/√N sem IMAX 27.7% (com IMAX 26.9%; escolhe IMAX em 8%); chutar o gênero mais comum (Documentary) 42.0%; chutar Drama 37.8%

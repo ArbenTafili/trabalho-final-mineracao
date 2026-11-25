@@ -4,7 +4,7 @@ Este documento reúne num lugar só as justificativas de todas as decisões do t
 
 **Como ler.** As decisões aparecem na ordem do processo KDD: seleção (seção 1 do notebook), pré-processamento (seção 2) e transformação (seção 3). Depois vêm as decisões de infraestrutura. Cada decisão segue o mesmo roteiro: o que foi decidido, por quê (com os números reais), alternativas descartadas, limitações, onde está a evidência e status. Quando a decisão mudou com o tempo, um item "Como chegou aqui" conta a sequência e diz o que vale hoje. Os códigos D1 a D6, 2-B e 2-C remetem ao registro em `docs/decisoes.md`; números como 2.2-b remetem às seções do notebook.
 
-Os números são os da v7, executada com os dados reais em 19/11/2026 (`execucoes/real_v7.ipynb`), salvo indicação. A seção 1 descreve os dados-alvo antes da fusão e da exclusão da v7, e por isso seus números não mudaram. Os tempos da 3.9 dependem da máquina e não são citados aqui. Os termos técnicos são explicados na primeira vez em que aparecem e, de novo, no [glossário](#glossario).
+Os números são os da v8, executada com os dados reais em 25/11/2026 no Mac (`execucoes/real_v8.ipynb`) e no Colab (a versão entregue), com os 22 números de controle idênticos nas duas, salvo indicação. A v8 mudou só a célula 3.8-a (decisão 24); da seção 1 até a 3.7, os números são os mesmos da v7. A seção 1 descreve os dados-alvo antes da fusão e da exclusão da v7. Os tempos da 3.9 dependem da máquina e não são citados aqui. Os termos técnicos são explicados na primeira vez em que aparecem e, de novo, no [glossário](#glossario).
 
 ## Índice
 
@@ -26,7 +26,7 @@ Os números são os da v7, executada com os dados reais em 19/11/2026 (`execucoe
 | 10 | [Gênero que falta: IMDb como fonte, kNN só como validação](#d10) | D2, 2-B; 2.2-b, 2.2-c | implementada (v6) |
 | 11 | [Conversão dos gêneros do IMDb](#d11) | 2-B; 2.2-b | implementada (v6) |
 | 12 | [Conferência da chave MovieLens → IMDb por código](#d12) | 2-C; 2.2-b | implementada (19/11/2026, texto da 2.2-b) |
-| 13 | [Ano que falta: IMDb](#d13) | D4; 2.2-b | implementada (v6); um pedido sem registro |
+| 13 | [Ano que falta e pedidos da D4](#d13) | D4; 2.2-b, 3.8-a | implementada (v6; teste do corte na v8) |
 | 14 | [Excluir os filmes que continuam sem gênero](#d14) | D6; 2.2-d | implementada (v7) |
 | 15 | [Amostras só para gráficos, com representatividade conferida](#d15) | 1.5-b, 2.4 | implementada (v5; sorteio pelo hash na v6) |
 | 16 | [Não imputar a matriz usuário × filme](#d16) | 2.5 | implementada (v5) |
@@ -37,8 +37,8 @@ Os números são os da v7, executada com os dados reais em 19/11/2026 (`execucoe
 | 20 | [PCA do vetor base com 6 componentes](#d20) | 3.4 a 3.6 | implementada (v5); hoje é comparação |
 | 21 | [Atípicos mantidos e marcados](#d21) | 3.7-a | implementada (v5) |
 | 22 | [Seguir para o agrupamento, esperando separação fraca](#d22) | 3.7-b | implementada (v5) |
-| 23 | [Vetor revisado e seu PCA como entrada principal de P1](#d23) | 3.8, 3.10 | implementada (v5) |
-| 24 | [Gêneros que se sobrepõem e gêneros raros no vetor](#d24) | D4, D5 | proposta (pendente) |
+| 23 | [Vetor revisado e seu PCA como entrada principal de P1](#d23) | 3.8, 3.10 | implementada (v5; grupos do perfil na v8) |
+| 24 | [Grupos do perfil: IMAX fora, Animation e Children juntos](#d24) | D5, D4; 3.8-a | implementada (v8) |
 | 25 | [Solução indexada para buscas por similaridade](#d25) | 3.9 | implementada (v5) |
 | | **Infraestrutura** | | |
 | 26 | [Repositório: fontes em `fonte/`, testes locais e execução final no Colab](#d26) | D1; README | implementada (v6; ampliada na v7) |
@@ -63,7 +63,9 @@ Nenhuma decisão foi tomada pronta. Cada mudança segue o mesmo caminho:
 3. uma **mesa de avaliação simulada** vota a ideia. A mesa é um agente de IA independente, que não participou das propostas e examina a ideia de vários pontos de vista. Até 18/11/2026 ela teve cinco membros (professor de Mineração de Dados, estatístico, engenheiro de dados, especialista em sistemas de recomendação e colega de turma). A partir da proposta 2-B, passou a ter sete: professor de Mineração de Dados, professor de IA e Aprendizado de Máquina, professor de Banco de Dados, cientista de dados, engenheiro de dados, estatístico e colega de turma;
 4. os ajustes pedidos pela mesa voltam ao aluno, e só então a ideia é implementada.
 
-Os critérios de cada decisão são fixados **antes** de ver o resultado. Quando isso não aconteceu, fica declarado: aplicar o critério de 10 pontos por faixa de avaliadores (decisão 10) e o critério de "não pesa" da D6 (decisão 14) foram definidos depois de ver os números.
+Os critérios de cada decisão são fixados **antes** de ver o resultado. Quando isso não aconteceu, fica declarado: aplicar o critério de 10 pontos por faixa de avaliadores (decisão 10) e o critério de "não pesa" da D6 (decisão 14) foram definidos depois de ver os números. Na D6 e na D5, os números esperados foram registrados antes da execução e conferidos depois.
+
+O aluno decide o rumo e, quando quer, delega os detalhes à mesa e ao Claude. Na proposta 2-C, ele aceitou os ajustes 1 a 4 e 6 a 9 e deixou com a mesa e com o Claude a decisão sobre o ajuste 5. Nas palavras dele: "você que deve mandar nas cadeiras".
 
 ### Regra que se confere à mão num caso, mas é executada por código em todos
 
@@ -338,6 +340,13 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 - *Validação externa:* nos próprios filmes sem gênero, o kNN concorda com o IMDb em 66,6% (5–9 avaliadores), 70,9% (10–49) e 80,6% (50 ou mais), contra 48,7% a 58,3% do chute. O comportamento dos usuários contém a informação de gênero e confirma o IMDb.
 - *Efeito nas distribuições (2.6):* `Unknown` deixa de existir: 4.822 filmes (25.221 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes); o V de Cramér muda no máximo 0,0001.
 
+**O papel da 2.2-c.** A 2.2-c não preenche nenhum valor. Ela é a evidência por trás de três decisões:
+1. *manter o gênero vindo do IMDb (esta decisão):* o comportamento dos usuários concorda com o IMDb a partir de 5 avaliadores (66,6% a 80,6%, contra 48,7% a 58,3% do chute);
+2. *deixar a contagem 1/√N só como comparação (D2, esta decisão):* na mesma validação, ela fica bem abaixo do kNN em todas as faixas;
+3. *excluir os 240 filmes restantes sem kNN (decisão 14):* a 2.2-c mostra que o kNN só funciona com 5 ou mais avaliadores, numa população de filmes com gênero, quase todos longas; os 55 filmes com público suficiente são quase todos curtas.
+
+O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da decisão 12.
+
 **Alternativas descartadas.**
 - *Dar Drama a todos:* acerta 47,3% nos filmes com 10 ou mais avaliadores.
 - *kNN como preenchimento (v5):* só alcança filmes com público suficiente e deixava milhares de filmes sem gênero.
@@ -369,14 +378,16 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 
 **O que foi decidido.** Os 17 gêneros com o mesmo nome nas duas fontes passam direto; `Family` vira `Children`; os gêneros que não existem no MovieLens (Biography, History, Music, Sport, Short etc.) são ignorados.
 
-**Por quê.** Cada linha da conversão foi justificada nos dois sentidos, nos filmes que têm gênero nas duas fontes (tabela inversa pedida pela mesa na 2-B).
+**Por quê.** Cada linha da conversão foi justificada nos dois sentidos, nos 57.099 filmes que têm gênero nas duas fontes (tabela inversa pedida pela mesa na 2-B).
 - Concordância alta nos dois sentidos: Animation e Documentary (acima de 96%); Horror, Comedy e Drama (de 79% a 94%).
-- `Children`: 63% dos filmes Children do MovieLens recebem `Family` no IMDb.
+- `Family` → `Children` é uma correspondência aproximada, não uma equivalência: 62,5% dos filmes Children do MovieLens têm Family no IMDb, e 53,2% dos filmes Family do IMDb são Children no MovieLens. É o mesmo nível de Mystery (67,0% e 47,5%) e de Film-Noir (73,4% e 45,3%), que também são convertidos.
 
-**Alternativas descartadas.** *Converter Music em Musical:* dos 1.879 filmes com Music no IMDb (e sem Musical), o MovieLens marca Musical em só 15% e Documentary em 33%.
+**Alternativas descartadas.**
+- *Converter Music em Musical:* dos 1.879 filmes com Music no IMDb (e sem Musical), o MovieLens marca Musical em só 15% e Documentary em 33% (`analises/resultados_imdb.txt`; no notebook, 15,4% Musical).
+- *Renomear Children para Family no perfil:* Family é o rótulo do IMDb, e a concordância com Children é a dos números acima (decisão 24).
 
 **Limitações.**
-- Concordância baixa em Musical (48% e 43%), Mystery (67% e 48%) e Film-Noir (73% e 45%): as duas fontes não usam esses rótulos do mesmo jeito.
+- Concordância baixa em Musical (48% e 43%), Mystery (67% e 48%), Film-Noir (73% e 45%) e Family/Children (62,5% e 53,2%): as duas fontes não usam esses rótulos do mesmo jeito.
 - Os gêneros sem correspondente se perdem. 209 dos 240 filmes que continuam sem gênero só têm gêneros que não existem no MovieLens (145 só Short e 26 só Music), e por isso são excluídos (decisão 14).
 
 **Onde está a evidência.** 2.2-b; `analises/resultados_imdb.txt` (parte 2).
@@ -431,9 +442,9 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 
 <a id="d13"></a>
 
-### 13. Ano que falta: IMDb
+### 13. Ano que falta e pedidos da D4
 
-*Registro: D4. Notebook: 2.2-b.*
+*Registro: D4. Notebook: 2.2-b, 3.8-a.*
 
 **O que foi decidido.** O ano dos filmes sem ano no título vem do IMDb, pela mesma chave. Só se preenche o que falta; o ano do título nunca é trocado. A análise por década da seção 1 continua só com o ano do título; o ano preenchido entra no vetor revisado (3.8, ano médio dos filmes vistos).
 
@@ -449,13 +460,14 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 - 3 filmes continuam sem ano (2 avaliações). Os 2 avaliados estão entre os 240 excluídos na decisão 14; o terceiro não tem avaliação.
 
 **Outros pedidos da D4.**
-- Escrever o denominador de cada participação de gênero: contagem simples na 1.6-c (um filme conta em cada um dos seus gêneros) e fracionária na 3.8 (peso 1/k). Os dois estão no texto do notebook.
-- Testar a sensibilidade do corte de 2% da 3.8 com War (1,80% na contagem fracionária, o gênero mais perto do corte): não há registro de que o teste foi feito.
-- Decidir o IMAX no vetor: ver decisão 24.
+- *Denominadores:* contagem simples na 1.6-c (um filme conta em cada um dos seus gêneros) e fracionária na 3.8 (peso 1/k). Os dois estão no texto do notebook.
+- *Sensibilidade do corte de 2% da 3.8, a começar por War (1,80% na contagem fracionária, o grupo mais perto do corte):* feito na v8 (3.8-a). Com o limite em 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`). Nenhum outro grupo muda entre 1,5% e 2,5%, e o limite fica em 2%.
+- *Musical e os gêneros raros:* Musical (1,25% na v8) fica em `raros`, e o agrupamento dos raros é feito só no vetor revisado, não no pré-processamento. Os rótulos dos dados não mudam.
+- *IMAX no vetor:* decidido na D5 (decisão 24).
 
-**Onde está a evidência.** 2.2-b; `analises/resultados_imdb.txt` (parte 3); `analises/resultados_chave_imdb.txt` (parte 9).
+**Onde está a evidência.** 2.2-b; 3.8-a (tabela de sensibilidade do limite); `analises/resultados_imdb.txt` (parte 3); `analises/resultados_chave_imdb.txt` (parte 9).
 
-**Status.** Preenchimento do ano implementado na v6. Teste de sensibilidade com War: pedido, sem registro de execução.
+**Status.** Preenchimento do ano implementado na v6. Teste do corte, Musical em `raros` e agrupamento só no vetor: v8 (25/11/2026). Nenhum pedido da D4 fica em aberto.
 
 <a id="d14"></a>
 
@@ -480,6 +492,7 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 - *Manter como `Unknown` (v6):* mantém um atributo que mede falta de informação e gera atípicos.
 - *kNN para os 55 com 5 ou mais avaliadores, excluindo só os 178 com 1 a 4 e os 7 sem avaliação:* afetaria menos usuários (124, no máximo 2,6% das avaliações de um usuário, menor resto de 38), mas, no conjunto dos curtas com 5 ou mais avaliadores, o kNN não supera o chute.
 - *kNN para todos:* com 1–2 avaliadores, o kNN fica abaixo do chute (2.2-c).
+- *Preencher com a contagem 1/√N sem o IMAX (o menor gênero, que a regra tende a escolher):* medida e descartada. Nos 2.128 curtas com gênero no MovieLens, acerta 33,5%, contra 49,4% de chutar Animation, e perde em todas as faixas de avaliadores (1–2: 35,2% contra 37,2%; 3–4: 48,6% contra 57,5%; 5–9: 31,5% contra 53,1%; 10 ou mais: 22,0% contra 52,4%). Nos filmes cujo IMDb só tem gêneros que não existem no MovieLens, acerta 27,7%, contra 42,0% de chutar Documentary.
 
 **Limitações.**
 - O critério de "não pesa" foi fixado depois de ver estes números. Isso fica declarado, e o critério vale daqui em diante.
@@ -488,7 +501,7 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 - Black Mirror (456 avaliações) sai junto, com a chave errada registrada (decisão 12).
 - Um usuário fica com 19 avaliações; os outros continuam com pelo menos 20.
 
-**Onde está a evidência.** 2.2-d; `analises/casos_sem_tratamento.py` → `analises/resultados_casos_sem_tratamento.txt` (partes A e B e, na parte D, o teste do kNN nos curtas); `docs/decisoes.md` (D6). Um grupo de 117 filmes parecidos com os 55, mas formado sobretudo por códigos ausentes do IMDb e longas, em que o kNN vai bem (62,4% contra 27,4%), está só no registro da D6; ele representa pouco os 55.
+**Onde está a evidência.** 2.2-d; `analises/casos_sem_tratamento.py` → `analises/resultados_casos_sem_tratamento.txt` (partes A e B; na parte D, o teste do kNN nos curtas; na parte E, o da contagem 1/√N sem o IMAX); `docs/decisoes.md` (D6). Um grupo de 117 filmes parecidos com os 55, mas formado sobretudo por códigos ausentes do IMDb e longas, em que o kNN vai bem (62,4% contra 27,4%), está só no registro da D6; ele representa pouco os 55.
 
 **Status.** Implementada na v7 (19/11/2026).
 
@@ -523,6 +536,8 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 *Notebook: tabela da 2.2; 2.5.*
 
 **O que foi decidido.** Os pares usuário–filme sem avaliação não são preenchidos. O perfil de cada usuário usa só os filmes que ele avaliou: é a alternativa de ignorar os valores ausentes.
+
+**A matriz nunca é montada.** A tabela de avaliações (uma linha por nota dada) é a forma compacta da mesma informação. A 2.5 só calcula o tamanho da matriz (usuários × filmes avaliados) e monta uma matriz de verdade apenas no recorte de 500 usuários × 300 filmes, para testar o preenchimento. Montada inteira, ela teria 9.558.548.587 células: a 8 bytes por célula, cerca de 76 GB (9.558.548.587 × 8 bytes).
 
 **Por quê.**
 - A matriz usuário × filme tem 9.558.548.587 células (162.541 usuários × 58.807 filmes avaliados), das quais só 24.998.518 (0,26%) têm nota. O usuário mediano avaliou 0,12% dos filmes; o mais ativo, 54,6%.
@@ -577,7 +592,7 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 - Sem classe, do CFS (que busca atributos ligados à classe e pouco ligados entre si) só a segunda parte se aplica.
 - Só o par `nota_media` × `prop_positivas` passou do limiar (Pearson 0,922; Spearman 0,946). Fica o atributo que usa a escala completa da nota; `prop_positivas` também depende de um limiar ainda a validar (decisão 4).
 - `prop_avaliacoes_total` mede atividade, é muito assimétrico e dominaria a distância; serve para descrever os grupos.
-- O segundo par mais associado, `prop_animation` × `prop_children` (0,823 / 0,804), ficou abaixo do limiar, e os dois foram mantidos.
+- O segundo par mais associado, `prop_animation` × `prop_children` (0,823 / 0,804), ficou abaixo do limiar, e os dois foram mantidos no vetor base. No vetor revisado, eles foram juntados por uma escolha de taxonomia, não por redundância (decisão 24).
 
 **Alternativas descartadas.**
 - *Wrappers e embedded:* dependem do algoritmo.
@@ -661,7 +676,7 @@ Nenhum usuário é removido: a marca `atipico` permite executar P1 com e sem ess
 
 **Limitações.**
 - Os limiares (quantil 0,999 e percentil 99) são escolhas registradas, e a referência χ² supõe normalidade, que os dados não seguem.
-- No vetor revisado, os atípicos são outros: 1.078, dos quais só 379 também são atípicos no vetor base (Jaccard 0,19).
+- No vetor revisado, os atípicos são outros: 1.171, dos quais só 412 também são atípicos no vetor base (Jaccard 0,20).
 
 **Onde está a evidência.** 3.7-a, 3.8-b, 3.10.
 
@@ -694,55 +709,93 @@ Nenhum usuário é removido: a marca `atipico` permite executar P1 com e sem ess
 
 *Notebook: 3.8, 3.8-b, 3.10.*
 
-**O que foi decidido.** A entrada principal de P1 é `X_rev_pca`: o PCA do vetor revisado, com 6 componentes (Kaiser-Guttman, 69,13% da variância). O vetor revisado:
-- usa a **proporção fracionária**: cada avaliação distribui peso 1/k entre os k gêneros do filme, e o vetor de gêneros soma 1;
-- junta no grupo `raros` os gêneros com menos de 2% das avaliações na contagem fracionária (War, Animation, Musical, Documentary, IMAX, Western e Film-Noir, que somam 7,85%); os rótulos continuam nos dados;
-- acrescenta atributos derivados: viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes vistos, e diversidade de gêneros (entropia normalizada);
+**O que foi decidido.** A entrada principal de P1 é `X_rev_pca`: o PCA do vetor revisado, com 7 componentes (Kaiser-Guttman, 73,94% da variância). O vetor revisado:
+- usa os **grupos do perfil** da decisão 24: o IMAX sai, e Animation e Children formam um grupo só, `Animation/Children`; ficam 17 grupos;
+- usa a **proporção fracionária**: cada avaliação distribui peso 1/k entre os k grupos do filme, e o vetor de gêneros soma 1;
+- junta no grupo `raros` os grupos com menos de 2% das avaliações na contagem fracionária (War, Musical, Documentary, Western e Film-Noir, que somam 5,27%); os rótulos continuam nos dados;
+- acrescenta atributos derivados: viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes vistos, e diversidade de gêneros (entropia normalizada, agora por log(17));
 - tem um gênero dominante, usado só para descrever.
 
-O vetor base e as matrizes z-score ficam como comparação. Até a v6, o vetor revisado também tirava `Unknown`; na v7, `Unknown` já não existe (decisão 14).
+O vetor base e as matrizes z-score ficam como comparação. Até a v6, o vetor revisado também tirava `Unknown`; desde a v7, `Unknown` já não existe (decisão 14).
 
 **Por quê.**
 - O vetor base tem três problemas: proporções que somam mais que 1 (contagem dupla de gêneros); gêneros raros que geram os valores extremos e a maior parte dos atípicos; e a atividade fora da distância.
 - A popularidade dos filmes vistos é o filtro com maior efeito sobre a nota (d de Cohen 0,73 entre filmes populares e de nicho, 1.7-c).
 - Os gêneros com pouca participação nas avaliações são informação real do catálogo, por isso continuam nos dados; no vetor, são agrupados para não distorcer as distâncias (1.6-c).
-- Com o mesmo número de componentes, o vetor revisado guarda mais variância (69,13% contra 66,84% no vetor base) e gera 17% menos atípicos (1.078 contra 1.293). O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos. Os eixos são interpretáveis: CP3 é nota média e viés; CP4, atividade contra popularidade; CP6, época dos filmes. A estatística de Hopkins fica próxima (0,68 contra 0,70 no PCA).
+- O vetor revisado guarda mais variância (73,94% em 7 componentes, contra 66,84% em 6 no vetor base) e gera 9% menos atípicos (1.171 contra 1.293), ao custo de um componente a mais. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos. A estatística de Hopkins fica próxima (0,68 contra 0,70 no PCA).
+- Os eixos são interpretáveis:
+  - CP1 (20,9%): ação, aventura e ficção contra romance;
+  - CP2 (14,7%): crime e suspense contra animação/infantil e fantasia;
+  - CP3 (11,7%): nota média e viés do usuário;
+  - CP4 (8,4%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
+  - CP5 (7,6%): gêneros raros, em usuários que veem filmes mais antigos;
+  - CP6 (5,7%): ano médio dos filmes vistos;
+  - CP7 (5,0%): atividade e comédia contra mistério e horror.
 - Redundância: o par mais associado (nota média × viés, Pearson 0,903, Spearman 0,881) só passa em um dos dois critérios; nenhum atributo sai, e o vetor tem 20 atributos.
+
+**Antes e depois dos grupos do perfil (só para transparência).** Sem os grupos (v7), o PCA revisado tinha 6 componentes (69,13% da variância), 1.078 atípicos e Hopkins de 0,68. Com IMAX fora e Animation/Children juntos (v8), passa a 7 componentes (73,94%), 1.171 atípicos e o mesmo Hopkins. A decisão dos grupos é de taxonomia e não depende desta comparação (decisão 24).
 
 **Alternativas.** *Vetor base (21 atributos ou PCA com 6 componentes):* fica como comparação, inclusive para medir o efeito da concentração de distâncias um pouco maior do vetor revisado.
 
 **Limitações.**
-- As distâncias ficam um pouco mais concentradas no vetor revisado: no PCA, o contraste relativo cai de 110,66 para 59,81, e a variância relativa, de 0,426 para 0,377.
-- A dimensionalidade intrínseca é a mesma nos dois PCA (6,4).
-- O limite de 2% é uma escolha registrada. Animation (1,66%) ficou em `raros`, mas o público infantil continua representado por Children (2,4%).
-- Há pontos em aberto sobre os gêneros raros e sobrepostos (decisão 24).
+- As distâncias ficam um pouco mais concentradas no vetor revisado: no PCA, o contraste relativo cai de 110,66 para 45,18, e a variância relativa, de 0,426 para 0,369.
+- A dimensionalidade intrínseca é de 7,2 no PCA revisado, contra 6,4 no PCA base (no espaço z, 12,0 contra 13,2).
+- No vetor revisado, os atípicos se concentram em horror (327 usuários).
+- O limite de 2% e os grupos são escolhas registradas; a sensibilidade do limite está na decisão 13.
 
-**Onde está a evidência.** 3.8, 3.8-b, 3.10; 1.6-c e 1.7-c para a origem dos atributos.
+**Onde está a evidência.** 3.8-a, 3.8-b, 3.10; 1.6-c e 1.7-c para a origem dos atributos; `execucoes/real_v8.ipynb`.
 
-**Status.** Implementada desde a v5. Desde a v6, o ano médio usa também o ano preenchido pelo IMDb.
+**Status.** Implementada desde a v5. Desde a v6, o ano médio usa também o ano preenchido pelo IMDb. Desde a v8 (25/11/2026), o vetor usa os grupos do perfil.
 
 <a id="d24"></a>
 
-### 24. Gêneros que se sobrepõem e gêneros raros no vetor
+### 24. Grupos do perfil: IMAX fora, Animation e Children juntos
 
-*Registro: D4 (ajustes) e D5.*
+*Registro: D5 (e o fechamento da D4). Notebook: 3.8-a, 3.8-b, 3.10.*
 
-**O que está proposto.** IMAX sai do vetor do perfil, por ser formato de exibição, não gênero. Animation e Children viram um grupo só no vetor. Os rótulos continuam nos dados.
+**O que foi decidido.** Só no vetor revisado (3.8):
+- o IMAX sai, porque é formato de exibição, e não gênero;
+- Animation e Children formam um grupo só, `Animation/Children`;
+- k passa a ser o número de grupos distintos do filme, e o limite de 2% vale para os 17 grupos que sobram (os 19 gêneros, sem IMAX e com Animation e Children juntos).
+
+Os rótulos dos dados não mudam, e o vetor base (seções 3.1 a 3.7) continua com os 19 gêneros.
+
+**Como chegou aqui.**
+1. *Proposta da D5 (registrada desde a v5):* IMAX fora do vetor do perfil; Animation e Children num grupo só.
+2. *25/11/2026:* o aluno aprovou ("faz sentido isso do perfil ter o Animation e Children"; sobre IMAX fora: "as duas"). A proposta foi à mesa de 7 só para o vetor revisado: 2 aprovam (professor de Banco de Dados e cientista de dados) e 5 aprovam com ajuste.
+3. *Ajustes da mesa:* números esperados registrados antes da execução; a decisão declarada como de taxonomia; sobreposição nos dois sentidos; tabela de sensibilidade do limite; uma constante única de agrupamento (`GRUPO_DO_GENERO`), com `assert` de 17 grupos e de soma 1; os quatro casos de borda testados ("Action|IMAX", só IMAX, "Animation|Children|Comedy", só "Animation"); exemplo calculado; fechar as pendências da D4.
+4. *v8 (25/11/2026):* implementada na célula 3.8-a. Os números esperados bateram (17 grupos; Animation/Children com 3,34%, esperado perto de 3,33%; 12 grupos mantidos; `raros` com 5,27%; 1 filme só com IMAX; com 1,5% só War muda e com 2,5% só Mystery). Novo número de controle: grupos do perfil.
 
 **Por quê.**
-- Dos 195 filmes IMAX, só 1 não tem outro gênero. Nas avaliações, 63% dos IMAX também são Action, 60% Adventure e 45% Sci-Fi.
-- Animation × Children é o par mais sobreposto: Jaccard de 0,21 nos filmes; 78% das avaliações de Animation também são Children; correlação de 0,82 entre usuários (3.2).
+- *IMAX é formato, não gênero:* dos 195 filmes IMAX, só 1 não tem outro gênero. Nas avaliações, 63% dos IMAX também são Action, 60% Adventure e 45% Sci-Fi.
+- *Animation e Children têm o mesmo público em grande parte:* 77,6% das avaliações de Animation são de filmes também Children; no sentido contrário, 59,6%. O Jaccard nos filmes é 0,213, e a correlação entre usuários, 0,82 (3.2).
+- *O grupo fica acima do limite:* Animation/Children tem 3,34% das avaliações. Na v7, Animation (1,66%) caía em `raros`, junto com Film-Noir e Documentary, e Children (2,38%) ficava sozinho. O grupo tem menos que a soma dos dois (4,03%): contado uma vez só por filme, ele passa a outros gêneros o peso que antes ia duas vezes para o mesmo público (cerca de 0,70 ponto, pela conta da mesa).
 
-**Alternativa em vigor.** O vetor revisado atual: IMAX e Animation no grupo `raros`, Children separado.
+**A natureza da decisão: taxonomia, não redundância.** A correlação entre Animation e Children (0,82) fica abaixo do limiar de redundância da 3.2 (0,9), e por isso os dois ficaram no vetor base. Os dois também não são equivalentes (77,6% num sentido, 59,6% no outro). Juntá-los é uma escolha de taxonomia (de como classificar): o grupo descreve o público de animação e infantil. Por isso a decisão vale qualquer que seja o resultado da 3.8-b; a comparação entre v7 e v8 aparece só para transparência (decisão 23).
 
-**Pontos em aberto.**
-- O corte de 2% usa a contagem fracionária, em que Musical tem 1,14% e IMAX 1,05%. (A mesa tinha comparado o corte com a contagem simples, em que Musical tem 3,86% e IMAX 4,25%; o registro corrigiu isso.)
-- A D4 pediu testar a sensibilidade do corte com War (1,80%); não há registro do teste.
-- Falta decidir se Musical e os gêneros raros são agrupados só no vetor ou já no pré-processamento.
+**Exemplo calculado** (peso de cada avaliação do filme, conferido contra o cálculo do Spark):
+- *Toy Story (1995)*, Adventure|Animation|Children|Comedy|Fantasy: na v7, 1/5 para cada um dos 5 gêneros; na v8, 1/4 para cada um dos 4 grupos (Adventure, Animation/Children, Comedy, Fantasy).
+- *Avatar (2009)*, Action|Adventure|Sci-Fi|IMAX: na v7, 1/4 para cada gênero; na v8, 1/3 para Action, Adventure e Sci-Fi. A fração do IMAX vai para os outros gêneros do filme.
+- Só 1 filme tem apenas IMAX (Encounter in the Third Dimension, 27 avaliações); essas avaliações ficam fora das proporções de gênero.
 
-**Onde está a evidência.** `docs/decisoes.md` (D4 e D5); 3.2 e 3.8.
+**Sensibilidade do limite.** Com o limite em 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`). Nenhum outro grupo muda entre 1,5% e 2,5%, e o limite fica em 2%.
 
-**Status.** Proposta; aguardando aprovação do aluno para ir à mesa.
+**Efeito no vetor revisado.**
+- 17 grupos; 12 acima do limite: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3%, Romance 6,8%, Crime 5,8%, Sci-Fi 5,7%, Fantasy 3,5%, Animation/Children 3,3%, Horror 3,2% e Mystery 2,5%.
+- `raros` passa a ter War, Musical, Documentary, Western e Film-Noir (5,27%); na v7, tinha também Animation e IMAX.
+- O vetor continua com 20 atributos: a coluna `frac_animation_children` entra no lugar de `frac_children` (na v7, Animation estava dentro de `raros`), e a diversidade de gêneros passa a ser normalizada por log(17).
+- O PCA revisado passa de 6 componentes (69,13%) para 7 (73,94%), e os atípicos, de 1.078 para 1.171; o Hopkins fica em 0,68 (decisão 23).
+
+**Alternativas descartadas.**
+- *Juntar também no vetor base:* o vetor base fica como representação fiel dos 19 gêneros e como comparação.
+- *Renomear Children para Family:* Family é o rótulo do IMDb e concorda só em parte com Children (62,5% e 53,2%, decisão 11).
+- *Manter como na v7 (Animation em `raros`, Children sozinho, IMAX no vetor):* separava um público que é em grande parte o mesmo e mantinha no perfil um formato de exibição.
+
+**Limitações.** O limite de 2% e os grupos são escolhas registradas. A animação adulta (anime, por exemplo) entra no grupo de animação e infantil, porque só 21% dos filmes têm os dois gêneros; os rótulos dos dados continuam separados.
+
+**Onde está a evidência.** 3.8-a (grupos, sobreposição, exemplo e tabela de sensibilidade), 3.8-b, 3.10; `execucoes/real_v8.ipynb`; `docs/decisoes.md` (D5 e D4).
+
+**Status.** Implementada na v8 (25/11/2026). Fecha também os pedidos pendentes da D4 (decisão 13). Com isso, o registro de decisões não tem mais pendências da seção 3; as próximas etapas são P1 e P2.
 
 <a id="d25"></a>
 
@@ -760,19 +813,19 @@ Os métodos comparados:
 
 **Por quê.**
 - P1 depende de buscas por similaridade: o DBSCAN busca todos os vizinhos dentro de um raio, a escolha desse raio usa a distância ao k-ésimo vizinho, e o kNN busca os k mais próximos. Com 162.541 usuários, a varredura linear compara cada consulta com todos.
-- Com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias nos dois espaços PCA, contra 92,6% (z revisado) e 89,2% (z base). Essa fração não depende da máquina.
+- Com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA base e 99,8% no PCA revisado, contra 92,2% (z revisado) e 89,2% (z base). Essa fração não depende da máquina.
 - O HNSW chega a recall@10 de 0,98 a 1,00 já com efSearch = 16.
 
 **Alternativas descartadas.**
 - *Ball-tree:* não ganha da varredura linear no PCA.
 - *Árvores nos espaços z (20 ou 21 dimensões):* muito mais lentas que a varredura linear. Em muitas dimensões, as partições deixam de descartar regiões.
-- *Pivôs por variância máxima:* a seleção incremental ganha na maioria dos casos, sobretudo nos espaços z (com 2 pivôs no z revisado, cerca de 60% contra 46%).
+- *Pivôs por variância máxima:* a seleção incremental ganha na maioria dos casos, sobretudo nos espaços z (com 2 pivôs no z revisado, cerca de 59% contra 46%).
 
-**Limitações.** Os tempos dependem da máquina; a fração de distâncias evitadas não. Na v6 (Colab), a kd-tree foi o índice exato mais rápido no PCA revisado. Na execução da v7 no Mac, ela ganhou da varredura linear no PCA base, mas perdeu no PCA revisado; na execução da v7 no Colab, que é a entregue, ela foi o índice exato mais rápido nos dois espaços PCA. É um exemplo de por que os tempos dependem da máquina.
+**Limitações.** Os tempos dependem da máquina; a fração de distâncias evitadas não. Na execução da v7 no Colab, a kd-tree foi o índice exato mais rápido nas buscas kNN no PCA. Nas execuções no Mac, a varredura linear chegou a ser tão rápida quanto a kd-tree, ou mais, em algumas buscas no PCA revisado. É um exemplo de por que os tempos dependem da máquina.
 
 **Onde está a evidência.** 3.9, 3.10.
 
-**Status.** Implementada desde a v5.
+**Status.** Implementada desde a v5. Na v8, o PCA revisado passou a ter 7 dimensões (decisão 23).
 
 ---
 
@@ -794,7 +847,7 @@ Os métodos comparados:
 **Por quê.**
 - Uma edição feita direto no `.ipynb` (inclusive no Colab) se perde na próxima montagem.
 - Executando em segundo plano na máquina do Colab, as saídas não se perdem se a aba do navegador ficar em segundo plano.
-- O pré-teste no Mac é rápido: o teste com dados sintéticos leva cerca de 2 minutos no M1 Pro (pico de 1,8 GB de memória) e a execução completa local, cerca de 4 minutos (pico de 4,1 GB); no Colab gratuito, a execução leva uns 30 minutos.
+- O pré-teste no Mac é rápido: o teste com dados sintéticos leva cerca de 2 minutos no M1 Pro (pico de 1,8 GB de memória) e a execução completa local, cerca de 6 minutos (pico de 3,3 GB); no Colab gratuito, a execução leva uns 32 minutos.
 - A licença do MovieLens não permite redistribuir os dados; os arquivos do IMDb são para uso não comercial.
 
 **Alternativas descartadas.** *Editar o notebook direto, inclusive no Colab:* a edição se perde na montagem seguinte.
@@ -805,7 +858,7 @@ Os métodos comparados:
 
 **Onde está a evidência.** `README.md`; `scripts/`; `tests/test_notebook.py`; `docs/decisoes.md` (D1).
 
-**Status.** Aprovada com ajustes em 18/11/2026 (4 aprovam com ajuste, 1 aprova); implementada na v6 (19/11/2026) e ampliada na v7, com os testes da fusão e da exclusão e 21 números de controle.
+**Status.** Aprovada com ajustes em 18/11/2026 (4 aprovam com ajuste, 1 aprova); implementada na v6 (19/11/2026) e ampliada na v7, com os testes da fusão e da exclusão e 21 números de controle. Na v8, os casos de borda dos grupos do perfil são testados dentro do notebook (decisão 24), e entra mais um número de controle: grupos do perfil.
 
 <a id="d27"></a>
 
@@ -817,9 +870,9 @@ Os métodos comparados:
 - Antes de qualquer sorteio com semente (amostras da 3.5 à 3.9 e validação cruzada da 2.2-c), os dados são ordenados por `userId` ou `movieId`.
 - A amostra de notas (1.5-b, 2.4) é sorteada pelo hash de `userId` e `movieId`, e não pela divisão interna do Spark.
 - Os quantis da seção 1 são exatos, não aproximados.
-- `scripts/numeros_controle.py` extrai números que resumem a execução (avaliações, usuários, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Eram 16 na v6; na v7 passaram a 21, com os da fusão e da exclusão (D1).
+- `scripts/numeros_controle.py` extrai números que resumem a execução (avaliações, usuários, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins etc.) e compara duas execuções célula a célula. Eram 16 na v6; na v7 passaram a 21, com os da fusão e da exclusão; na v8, entrou o número de grupos do perfil (D1 e D5).
 
-**Por quê.** O Spark devolve as linhas numa ordem que muda com o número de núcleos; sem essas regras, as amostras mudariam de máquina para máquina. Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os mesmos números de controle. Na v6 (19/11/2026), o Mac (8 núcleos) e o Colab (2 núcleos) deram os 16 números idênticos. Só mudam os tempos da 3.9, que dependem da máquina, e a ordem de dois gêneros empatados na lista de votos do exemplo da 2.2-c.
+**Por quê.** O Spark devolve as linhas numa ordem que muda com o número de núcleos; sem essas regras, as amostras mudariam de máquina para máquina. Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os mesmos números de controle. Na v6 e na v7 (19/11/2026), o Mac (8 núcleos) e o Colab (2 núcleos) deram os números de controle idênticos (16 na v6, 21 na v7). Só mudam os tempos da 3.9, que dependem da máquina, e a ordem de itens empatados em duas listas: os votos do exemplo da 2.2-c e o décimo atributo mais frequente entre os atípicos da 3.7-a.
 
 **Correções encontradas no caminho.**
 - v6: o Spark lia errado 11 títulos com aspas (sem a opção `escape` do CSV, eles ficavam com aspas sobrando e sem o ano no fim); a amostra de 3.000 usuários da 1.8-a dependia da ordem das linhas.
@@ -839,7 +892,7 @@ Os métodos comparados:
 
 *README: "Recorte do IMDb". Script: `scripts/recortar_imdb.py`.*
 
-**O que foi decidido.** O notebook usa um recorte fixo do `title.basics` com as 62.294 linhas dos filmes do MovieLens (1 MB). O recorte é identificado pelo MD5, uma "impressão digital" do arquivo que muda se qualquer byte mudar. O recorte usado na v6 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`; o arquivo de origem, baixado em 18/11/2026, tem MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`. O recorte fica fora do git; a dupla guarda uma cópia num local privado (por exemplo, no Drive) e a envia ao Colab junto com o notebook.
+**O que foi decidido.** O notebook usa um recorte fixo do `title.basics` com as 62.294 linhas dos filmes do MovieLens (1 MB). O recorte é identificado pelo MD5, uma "impressão digital" do arquivo que muda se qualquer byte mudar. O recorte usado na v6, na v7 e na v8 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`; o arquivo de origem, baixado em 18/11/2026, tem MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`. O recorte fica fora do git; a dupla guarda uma cópia num local privado (por exemplo, no Drive) e a envia ao Colab junto com o notebook.
 
 **Por quê.** O IMDb publica só a versão do dia e atualiza o arquivo todo dia. Sem o recorte, o notebook baixa a versão do dia, e os números podem mudar na última casa. Com o recorte, todas as execuções usam os mesmos dados.
 
@@ -866,7 +919,7 @@ Os métodos comparados:
 | `imputacao_por_faixa.py` | D2 (decisão 10) | `resultados_imputacao_por_faixa.txt` |
 | `imdb.py` | D2 e D4 (decisões 10, 11 e 13) | `resultados_imdb.txt` |
 | `chave_imdb.py` | 2-C (decisão 12) | `resultados_chave_imdb.txt` |
-| `casos_sem_tratamento.py` | D6 (decisões 9 e 14), incluindo o teste do kNN nos curtas | `resultados_casos_sem_tratamento.txt` |
+| `casos_sem_tratamento.py` | D6 (decisões 9 e 14), incluindo os testes do kNN e da contagem 1/√N sem o IMAX nos curtas | `resultados_casos_sem_tratamento.txt` |
 
 **Por quê.** Para decidir com números o que entra no notebook, antes de mexer nele. Os resultados gravados ficam como evidência conferível, com o MD5 do arquivo do IMDb usado.
 
