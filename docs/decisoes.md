@@ -212,6 +212,10 @@ Fontes externas consultadas em 19/11/2026 (pedido do engenheiro de dados, porque
 - **seção 3:** sem `prop_unknown`, o vetor base tem 21 atributos; o PCA passa a ter d′ = 6 (66,84%, antes 7 e 68,41%); atípicos 1.293 (antes 1.365); Hopkins robusto 0,705 no PCA. O vetor revisado quase não muda (69,13%; 1.078 atípicos). O kNN da 2.2-c acerta 83,38% (antes 83,35%), porque a fusão muda as partes da validação cruzada;
 - **correções encontradas:** o gerador de dados sintéticos sorteava "Children" como gênero do IMDb para filmes sem gênero (o IMDb usa "Family"), o que deixava filmes populares sem gênero; a 3.8-a imprimia "log(20)" fixo na normalização da diversidade, que agora usa o número real de gêneros (19).
 
+## Medição complementar: PCA com 80% da variância (25/11/2026)
+
+O aluno pediu para ver o PCA com 9 componentes (critério de 80% da variância, registrado desde a 3.4 como alternativa) ao lado do PCA principal. Não muda nenhuma decisão: só acrescenta a comparação, na v9, da 3.5 à 3.9 (concentração de distâncias, dimensionalidade intrínseca, t-SNE, Hopkins, tabela da 3.8-b e índices da 3.9), nos dois vetores. Resultado na execução com os dados reais: com 9 componentes, a variância retida sobe (base 80,07%; revisado 82,37%), a variância relativa das distâncias cai um pouco (0,417 e 0,354, contra 0,426 e 0,369), o Hopkins robusto fica em 0,718 e 0,685 (contra 0,705 e 0,684), os atípicos sobem (1.422 e 1.351, contra 1.293 e 1.171) e os pivôs evitam 99,2% e 99,0% das distâncias (contra 99,9% e 99,8%). A escolha entre 6/7 e 9 componentes fica para P1.
+
 ## Pendências do aluno
 
 - Validar o limiar de nota positiva (4,0). Ele só define `prop_positivas`, que já está fora da entrada de P1 (redundante com `nota_media`, 3.2); só volta a importar se esse atributo voltar.

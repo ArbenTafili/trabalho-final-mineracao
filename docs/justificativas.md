@@ -630,7 +630,7 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 
 ### 20. PCA do vetor base com 6 componentes
 
-*Notebook: 3.4, 3.5, 3.5-b, 3.6.*
+*Notebook: 3.4, 3.5, 3.5-b, 3.6, 3.7-b, 3.8-b, 3.9.*
 
 **O que foi decidido.** O **PCA** (análise de componentes principais: troca os atributos por combinações deles, ordenadas pela variância que explicam) é aplicado à matriz padronizada. O número de componentes, d′ = 6, vem do critério de Kaiser-Guttman (ficar com os componentes de autovalor ≥ 1). A matriz PCA é uma entrada a comparar em P1, não uma substituição obrigatória dos 21 atributos. O critério de 80% da variância (9 componentes) fica como alternativa a testar em P1.
 
@@ -642,7 +642,19 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 
 **Alternativas.**
 - *Broken-stick (2 componentes):* muito abaixo da dimensionalidade intrínseca.
-- *80% da variância (9 componentes):* mais perto da dimensionalidade intrínseca; fica como alternativa em P1.
+- *80% da variância (9 componentes):* mais perto da dimensionalidade intrínseca; fica como alternativa em P1. A pedido do aluno, desde a v9 (25/11/2026) ele é medido ao lado do PCA principal da 3.5 à 3.9, nos dois vetores:
+
+  | | base, 6 | base, 9 | revisado, 7 | revisado, 9 |
+  |---|---:|---:|---:|---:|
+  | variância retida | 66,84% | 80,07% | 73,94% | 82,37% |
+  | variância relativa das distâncias | 0,426 | 0,417 | 0,369 | 0,354 |
+  | contraste relativo | 110,66 | 92,57 | 45,18 | 44,28 |
+  | dimensionalidade intrínseca | 6,4 | 8,4 | 7,2 | 8,5 |
+  | Hopkins (1–99) | 0,705 | 0,718 | 0,684 | 0,685 |
+  | atípicos | 1.293 | 1.422 | 1.171 | 1.351 |
+  | pivôs: distâncias evitadas (16 pivôs) | 99,9% | 99,2% | 99,8% | 99,0% |
+
+  Com 9 componentes, guarda-se mais informação e a tendência de agrupamento sobe um pouco no vetor base; em troca, as distâncias ficam um pouco menos nítidas, aparecem mais atípicos e as buscas de vizinhos ficam mais lentas. As diferenças são pequenas, e a escolha fica para P1, pela qualidade dos grupos.
 - *Os 21 atributos sem PCA:* continuam como entrada candidata (`X_p1_padronizado`).
 
 **Limitações.** O PCA com 6 componentes guarda 66,84% da variância e descarta parte da estrutura.

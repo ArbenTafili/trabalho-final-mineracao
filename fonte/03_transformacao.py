@@ -239,6 +239,10 @@ for cp in cargas.columns:
     print(f"{cp}: " + ", ".join(f"{a} ({cargas.loc[a, cp]:+.2f})" for a in principais))
 X_p1_pca = pd.DataFrame(pca_completo.transform(X_p1_padronizado)[:, :d_pca], columns=cargas.columns, index=perfil_pd.index)
 print(f"Matriz candidata no espaço PCA: {X_p1_pca.shape}; variância retida = {100 * acumulada[d_pca - 1]:.2f}%")
+# Alternativa para comparação nas seções seguintes: os componentes que somam 80% da variância.
+X_p1_pca80 = pd.DataFrame(pca_completo.transform(X_p1_padronizado)[:, :d_variancia],
+                          columns=[f"CP{k}" for k in range(1, d_variancia + 1)], index=perfil_pd.index)
+print(f"Alternativa para comparação: PCA com {d_variancia} componentes ({100 * acumulada[d_variancia - 1]:.2f}% da variância)")
 
 # %% [markdown]
 # ### 3.5 Dimensionalidade e concentração de distâncias
@@ -260,6 +264,7 @@ espacos = {
     f"z-score ({X_p1_padronizado.shape[1]} atributos)": X_p1_padronizado,
     f"min-max ({X_p1_minmax.shape[1]} atributos)": X_p1_minmax,
     f"PCA ({X_p1_pca.shape[1]} componentes)": X_p1_pca,
+    f"PCA 80% ({X_p1_pca80.shape[1]} componentes)": X_p1_pca80,
 }
 linhas_dist, distancias = [], {}
 for nome, X in espacos.items():
@@ -305,7 +310,8 @@ N_AMOSTRA_ID = 10_000
 idx_id = perfil_pd.sample(n=N_AMOSTRA_ID, random_state=42).index
 linhas_id = []
 for nome, X in [(f"z-score ({X_p1_padronizado.shape[1]} atributos)", X_p1_padronizado),
-                 (f"PCA ({X_p1_pca.shape[1]} componentes)", X_p1_pca)]:
+                 (f"PCA ({X_p1_pca.shape[1]} componentes)", X_p1_pca),
+                 (f"PCA 80% ({X_p1_pca80.shape[1]} componentes)", X_p1_pca80)]:
     media_id, por_k = dimensao_intrinseca_mle(X.loc[idx_id].to_numpy())
     linhas_id.append((nome, X.shape[1], media_id, min(por_k), max(por_k)))
 tabela_id = pd.DataFrame(linhas_id, columns=["espaço", "dimensões", "ID_MLE (média k=10..20)", "mín", "máx"])
@@ -313,9 +319,9 @@ print(f"Amostra fixa de {N_AMOSTRA_ID:,} usuários (semente 42)")
 print(tabela_id.round(2).to_string(index=False))
 
 # %% [markdown]
-# **Leitura dos resultados.** A dimensionalidade intrínseca estimada é de cerca de 13 no espaço padronizado de 21 atributos (12,7 a 14,1, conforme k) e de cerca de 6 no espaço PCA de 6 componentes (6,4). Os 21 atributos têm redundância, mas a estrutura dos dados não cabe em duas ou três dimensões.
+# **Leitura dos resultados.** A dimensionalidade intrínseca estimada é de cerca de 13 no espaço padronizado de 21 atributos (12,7 a 14,1, conforme k) de cerca de 6 no espaço PCA de 6 componentes (6,4) e de cerca de 8 no PCA com 80% da variância, de 9 componentes (8,4). Os 21 atributos têm redundância, mas a estrutura dos dados não cabe em duas ou três dimensões.
 #
-# **Consequência:** o PCA com 6 componentes (66,84% da variância) é uma redução útil para as distâncias, mas descarta parte da estrutura. O critério de 80% da variância (9 componentes) fica mais próximo da dimensionalidade intrínseca e é uma alternativa a testar em P1.
+# **Consequência:** o PCA com 6 componentes (66,84% da variância) é uma redução útil para as distâncias, mas descarta parte da estrutura. O critério de 80% da variância (9 componentes, 80,07%) fica mais próximo da dimensionalidade intrínseca. Ele entra como alternativa ao lado do PCA com 6 componentes nas comparações de 3.5 a 3.9 e é testado em P1. Na concentração de distâncias (3.5), ele separa perto de longe um pouco menos que o PCA com 6 componentes (variância relativa de 0,417 contra 0,426; contraste relativo de 92,57 contra 110,66) e ainda mais que os espaços de 21 atributos.
 
 # %% [markdown]
 # ### 3.6 Visualização do espaço transformado
@@ -337,14 +343,16 @@ idx_vis = perfil_pd.sample(n=3000, random_state=7).index
 grupo_media_vis = np.ceil(perfil_pd.loc[idx_vis, "nota_media"]).clip(1, 5).astype(int).to_numpy()
 pca_2d = X_p1_pca.loc[idx_vis, ["CP1", "CP2"]].to_numpy()
 tsne_2d = TSNE(n_components=2, perplexity=30, init="pca", random_state=42).fit_transform(X_p1_pca.loc[idx_vis].to_numpy())
+tsne_2d_80 = TSNE(n_components=2, perplexity=30, init="pca", random_state=42).fit_transform(X_p1_pca80.loc[idx_vis].to_numpy())
 idx_mds = idx_vis[:500]
 mds_2d = MDS(n_components=2, n_init=1, max_iter=300, random_state=42).fit_transform(X_p1_padronizado.loc[idx_mds].to_numpy())
 
-fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+fig, axes = plt.subplots(1, 4, figsize=(26, 6))
 projecoes = [
     (axes[0], pca_2d, grupo_media_vis, f"PCA: CP1 × CP2 ({len(idx_vis):,} usuários)"),
-    (axes[1], mds_2d, grupo_media_vis[:len(idx_mds)], f"MDS sobre os {X_p1_padronizado.shape[1]} atributos z ({len(idx_mds)} usuários)"),
-    (axes[2], tsne_2d, grupo_media_vis, f"t-SNE sobre o espaço PCA ({len(idx_vis):,} usuários)"),
+    (axes[1], mds_2d, grupo_media_vis[:len(idx_mds)], f"MDS: {X_p1_padronizado.shape[1]} atributos z ({len(idx_mds)} usuários)"),
+    (axes[2], tsne_2d, grupo_media_vis, f"t-SNE: PCA com {X_p1_pca.shape[1]} componentes"),
+    (axes[3], tsne_2d_80, grupo_media_vis, f"t-SNE: PCA 80% ({X_p1_pca80.shape[1]} componentes)"),
 ]
 for ax, coords, cor, titulo in projecoes:
     pontos = ax.scatter(coords[:, 0], coords[:, 1], c=cor, cmap="viridis", s=6, alpha=.6, vmin=1, vmax=5)
@@ -369,7 +377,7 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Projeções 2D:** PCA, MDS e t-SNE mostram uma nuvem contínua de usuários, sem grupos isolados.
+# - **Projeções 2D:** PCA, MDS e t-SNE mostram uma nuvem contínua de usuários, sem grupos isolados. O t-SNE sobre o PCA com 9 componentes mostra o mesmo quadro: uma nuvem contínua, com poucos aglomerados pequenos na borda.
 # - **Nota média:** a cor não organiza a estrutura principal. Usuários com médias diferentes aparecem misturados, com poucas regiões locais de médias mais baixas ou mais altas no t-SNE.
 # - **Coordenadas paralelas:** a variação entre usuários está sobretudo nas proporções de gênero.
 #
@@ -521,11 +529,14 @@ def hopkins(X, dominio="min-max", m=M_HOPKINS, repeticoes=REPETICOES_HOPKINS, se
 
 sem_atipicos = ~perfil_pd["atipico"].to_numpy()
 ROTULO_PCA, ROTULO_Z = f"PCA ({X_p1_pca.shape[1]})", f"z-score ({X_p1_padronizado.shape[1]})"
+ROTULO_PCA80 = f"PCA 80% ({X_p1_pca80.shape[1]})"
 cenarios_hopkins = [
     (ROTULO_PCA, "todos", X_p1_pca.to_numpy()),
     (ROTULO_PCA, "sem atípicos", X_p1_pca.to_numpy()[sem_atipicos]),
     (ROTULO_Z, "todos", X_p1_padronizado.to_numpy()),
     (ROTULO_Z, "sem atípicos", X_p1_padronizado.to_numpy()[sem_atipicos]),
+    (ROTULO_PCA80, "todos", X_p1_pca80.to_numpy()),
+    (ROTULO_PCA80, "sem atípicos", X_p1_pca80.to_numpy()[sem_atipicos]),
 ]
 linhas_hopkins = []
 for espaco, populacao, X in cenarios_hopkins:
@@ -536,7 +547,7 @@ for espaco, populacao, X in cenarios_hopkins:
             u_vis, w_vis = u, w
 
 # Controle: dados uniformes com o mesmo tamanho, no domínio dos percentis 1–99 de cada espaço.
-for espaco, X in [(ROTULO_PCA, X_p1_pca.to_numpy()), (ROTULO_Z, X_p1_padronizado.to_numpy())]:
+for espaco, X in [(ROTULO_PCA, X_p1_pca.to_numpy()), (ROTULO_Z, X_p1_padronizado.to_numpy()), (ROTULO_PCA80, X_p1_pca80.to_numpy())]:
     X_uniforme = np.random.default_rng(0).uniform(np.percentile(X, 1, axis=0), np.percentile(X, 99, axis=0), size=X.shape)
     h_medio, h_dp, _, _ = hopkins(X_uniforme, "min-max")
     linhas_hopkins.append((espaco, "controle: dados uniformes", "min-max", len(X_uniforme), h_medio, h_dp))
@@ -561,9 +572,9 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Controle:** com dados uniformes, H = 0,500 nos dois espaços, o que confirma o cálculo.
+# - **Controle:** com dados uniformes, H = 0,500 nos três espaços, o que confirma o cálculo.
 # - **Domínio mín–máx:** H = 0,960 no PCA e 0,953 no z-score. Esses valores são inflados pelos extremos, que alargam o domínio dos pontos uniformes: sem os 1.293 atípicos, caem para 0,930 e 0,932.
-# - **Domínio robusto (percentis 1–99):** H = 0,705 no PCA e 0,767 no z-score; sem os atípicos, 0,696 e 0,762. O desvio-padrão entre repetições é no máximo 0,0040.
+# - **Domínio robusto (percentis 1–99):** H = 0,705 no PCA com 6 componentes, 0,718 no PCA com 9 e 0,767 no z-score; sem os atípicos, 0,696, 0,709 e 0,762. O desvio-padrão entre repetições é no máximo 0,0040.
 # - **Distâncias:** no histograma, a distância de um usuário ao vizinho real mais próximo (w) fica, em geral, abaixo da distância de um ponto uniforme ao usuário mais próximo (u), mas as duas distribuições se sobrepõem em parte.
 #
 # **Interpretação:** os usuários estão mais concentrados do que pontos uniformes, e isso não é efeito dos atípicos, porque retirá-los quase não muda o H robusto. Mas a tendência é moderada: uma referência usual é H > 0,75 para tendência clara, e o espaço PCA fica abaixo dela. Junto com as projeções de 3.6, o quadro é de um núcleo denso com caudas, e não de grupos naturalmente separados.
@@ -827,11 +838,16 @@ def atipicos_no_espaco(X):
 
 
 perfil_rev_pd["atipico_rev"] = atipicos_no_espaco(X_rev_pca)
+# Alternativa registrada em 3.4: o PCA com os componentes que somam 80% da variância, nos dois vetores. Só comparação.
+X_rev_pca80 = pd.DataFrame(pca_rev.transform(X_rev_padronizado)[:, :d_80_rev],
+                           columns=[f"CP{k}" for k in range(1, d_80_rev + 1)], index=perfil_pd.index)
 espacos_comparacao = [
     ("base", "z-score", X_p1_padronizado, np.nan, np.nan),
     ("base", "PCA", X_p1_pca, 100 * acumulada[d_pca - 1], int(perfil_pd["atipico"].sum())),
     ("revisado", "z-score", X_rev_padronizado, np.nan, np.nan),
     ("revisado", "PCA", X_rev_pca, np.cumsum(variancia_rev)[d_rev - 1], int(perfil_rev_pd["atipico_rev"].sum())),
+    ("base", "PCA 80%", X_p1_pca80, 100 * acumulada[d_variancia - 1], int(atipicos_no_espaco(X_p1_pca80).sum())),
+    ("revisado", "PCA 80%", X_rev_pca80, np.cumsum(variancia_rev)[d_80_rev - 1], int(atipicos_no_espaco(X_rev_pca80).sum())),
 ]
 linhas_comp = []
 for vetor, espaco, X, var_retida, n_atipicos in espacos_comparacao:
@@ -892,6 +908,16 @@ plt.show()
 # - **Atípicos:** 1.171 no vetor revisado, contra 1.293 no base (−9%). Só 412 são atípicos nos dois (Jaccard 0,20). No vetor revisado, os atípicos se concentram em horror (327 usuários).
 # - **Hopkins (domínio robusto):** 0,68 no PCA revisado e 0,77 no z revisado, contra 0,70 e 0,77 no base. A tendência de agrupamento continua moderada.
 # - **Antes e depois dos grupos do perfil (transparência):** sem os grupos (v7), o PCA revisado tinha 6 componentes (69,13% da variância), 1.078 atípicos e Hopkins de 0,68. Com IMAX fora e Animation/Children juntos, passa a 7 componentes (73,94%), 1.171 atípicos e o mesmo Hopkins. A decisão dos grupos é de taxonomia e não depende desta comparação.
+# - **PCA com 80% da variância (9 componentes, só comparação):**
+#
+#   | | base, 6 | base, 9 | revisado, 7 | revisado, 9 |
+#   |---|---:|---:|---:|---:|
+#   | variância retida | 66,84% | 80,07% | 73,94% | 82,37% |
+#   | variância relativa das distâncias | 0,426 | 0,417 | 0,369 | 0,354 |
+#   | Hopkins (1–99) | 0,705 | 0,718 | 0,684 | 0,685 |
+#   | atípicos | 1.293 | 1.422 | 1.171 | 1.351 |
+#
+#   Com 9 componentes, os dois vetores guardam mais informação e a tendência de agrupamento sobe um pouco no vetor base. Em troca, as distâncias ficam um pouco menos nítidas e aparecem mais atípicos. As diferenças são pequenas nos dois sentidos, e a escolha entre 6 ou 7 e 9 componentes fica para P1, pela qualidade dos grupos.
 #
 # **Interpretação:** o vetor revisado guarda mais variância, gera menos atípicos e acrescenta eixos interpretáveis (atividade, popularidade e época), ao custo de um componente a mais. As distâncias ficam um pouco mais concentradas, e a tendência de agrupamento fica próxima da do vetor base.
 #
@@ -929,6 +955,8 @@ espacos_indice = {
     f"base z ({X_p1_padronizado.shape[1]})": X_p1_padronizado.to_numpy(),
     f"revisado PCA ({X_rev_pca.shape[1]})": X_rev_pca.to_numpy(),
     f"revisado z ({X_rev_padronizado.shape[1]})": X_rev_padronizado.to_numpy(),
+    f"base PCA 80% ({X_p1_pca80.shape[1]})": X_p1_pca80.to_numpy(),
+    f"revisado PCA 80% ({X_rev_pca80.shape[1]})": X_rev_pca80.to_numpy(),
 }
 rng_indice = np.random.default_rng(7)
 consultas_idx = rng_indice.choice(len(perfil_pd), size=N_CONSULTAS_KNN, replace=False)
@@ -1029,14 +1057,15 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,20 s para 1.000 buscas kNN no PCA revisado, contra 0,73 s da varredura linear. A ball-tree não ganha da varredura.
-# - **Espaços z (20 ou 21 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 6,2 a 9,9 s; ball-tree 14,8 a 18,2 s; varredura 0,9 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
-# - **HNSW:** 1.000 buscas em 0,017 a 0,029 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (6,8 a 12,7 s).
+# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,17 s para 1.000 buscas kNN no PCA revisado, contra 0,53 s da varredura linear. A ball-tree não ganha da varredura.
+# - **Espaços z (20 ou 21 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 5,0 a 6,4 s; ball-tree 12,0 a 12,6 s; varredura 0,6 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
+# - **HNSW:** 1.000 buscas em 0,013 a 0,026 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (5,0 a 8,9 s).
+# - **PCA com 80% da variância (9 componentes):** a kd-tree perde a vantagem. Nas 1.000 buscas kNN, leva 0,33 s no vetor base e 0,54 s no revisado, contra 0,57 s e 0,56 s da varredura; nas buscas por abrangência, fica 2 a 4 vezes mais lenta que a varredura (0,12 e 0,22 s, contra 0,05 e 0,06 s). Com 16 pivôs, a busca por abrangência descarta 99,2% (base) e 99,0% (revisado) das distâncias. O HNSW continua rápido (0,026 e 0,015 s, recall@10 de 1,00).
 # - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA base e 99,8% no PCA revisado, contra 92,2% (z revisado) e 89,2% (z base). Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, cerca de 59% contra 46%.
 #
 # **Limitação:** os tempos dependem da máquina (Colab gratuito); a fração de distâncias evitadas não.
 #
-# **Consequência:** P1 usa o espaço PCA, onde os índices funcionam. As buscas exatas (DBSCAN e distância ao k-ésimo vizinho) usam kd-tree ou pivôs com seleção incremental, e o HNSW atende buscas aproximadas.
+# **Consequência:** P1 usa o espaço PCA, onde os índices funcionam. As buscas exatas (DBSCAN e distância ao k-ésimo vizinho) usam kd-tree ou pivôs com seleção incremental, e o HNSW atende buscas aproximadas. Se P1 usar o PCA com 9 componentes, as buscas exatas por abrangência (DBSCAN) devem usar pivôs ou a varredura, e não a kd-tree.
 
 # %% [markdown]
 # ### 3.10 Resultado da transformação e entrada de P1
@@ -1047,6 +1076,7 @@ plt.show()
 # | `X_p1_padronizado` | 21 atributos (média, DP e 19 proporções de gênero), z-score | entrada candidata interpretável |
 # | `X_p1_minmax` | os mesmos 21 atributos em [0, 1] | alternativa de escala |
 # | `X_p1_pca` | 6 componentes principais (critério de Kaiser-Guttman, 66,84%) | entrada candidata com dimensionalidade reduzida |
+# | `X_p1_pca80`, `X_rev_pca80` | 9 componentes, 80% da variância, nos dois vetores (80,07% e 82,37%) | alternativa a testar em P1 |
 # | `perfil_pd["atipico"]` | 1.293 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
 # | `perfil_rev_pd` | atributos derivados, proporções fracionárias, gênero dominante e `atipico_rev` (1.171 usuários) | descrever os grupos do vetor revisado |
 # | `X_rev_padronizado` | 20 atributos do vetor revisado, z-score | entrada alternativa interpretável |
@@ -1070,13 +1100,14 @@ plt.show()
 #   | z-score, 21 atributos | 33,22 | 0,3740 |
 #   | min-max, 21 atributos | 22,24 | 0,3590 |
 #   | PCA, 6 componentes | 110,66 | 0,4259 |
+#   | PCA 80%, 9 componentes | 92,57 | 0,4173 |
 #
-#   O espaço PCA foi o que menos concentrou as distâncias e o min-max, o que mais concentrou.
+#   Os espaços PCA foram os que menos concentraram as distâncias (o de 6 componentes um pouco menos que o de 9), e o min-max, o que mais concentrou.
 #
 # - **Dimensionalidade intrínseca:** cerca de 13 no espaço z de 21 atributos. As projeções 2D mostram uma nuvem contínua, sem grupos isolados.
 # - **Valores atípicos:** 1.293 usuários (0,80%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Documentary, Film-Noir, Western e War). Foram mantidos e marcados.
 # - **Tendência de agrupamento:** estatística de Hopkins de 0,705 (PCA) e 0,767 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
 # - **Vetor revisado (3.8):** proporções fracionárias, IMAX fora, Animation e Children num grupo só, gêneros raros agrupados, sem contagem dupla e com cinco atributos derivados. Retém 73,94% da variância em 7 componentes (o base, 66,84% em 6), tem 9% menos atípicos (1.171) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
-# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,20 s (varredura: 0,73 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
+# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,17 s (varredura: 0,53 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
 #
-# **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda mais variância, gera menos atípicos, não depende da contagem dupla de gêneros e trata animação e infantil como um público só. O PCA do vetor base e as matrizes z-score ficam como comparação. As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.
+# **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda mais variância, gera menos atípicos, não depende da contagem dupla de gêneros e trata animação e infantil como um público só. O PCA do vetor base e as matrizes z-score ficam como comparação, e o PCA com 80% da variância (9 componentes, nos dois vetores) é a alternativa a testar: guarda mais informação, mas tem mais atípicos e distâncias um pouco menos nítidas (3.8-b). As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.
