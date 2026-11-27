@@ -111,7 +111,7 @@ O gênero e o ano que faltam no MovieLens vêm do arquivo público `title.basics
 .venv/bin/python scripts/recortar_imdb.py
 ```
 
-O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial), com a data e o MD5 do arquivo de origem em `imdb_recorte_movielens.info`. A dupla guarda uma cópia num local privado (por exemplo, no Drive) para que as duas execuções usem o mesmo recorte. O recorte usado da v6 à v9 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`.
+O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial), com a data e o MD5 do arquivo de origem em `imdb_recorte_movielens.info`. A dupla guarda uma cópia num local privado (por exemplo, no Drive) para que as duas execuções usem o mesmo recorte. O recorte usado da v6 à v10 tem MD5 `f041a014c94b30678e0d4e9a18bc9c6d`.
 
 ## Decisões e justificativas
 
@@ -119,6 +119,7 @@ O recorte fica em `dados/imdb/` (fora do git: o IMDb é para uso não comercial)
 - [`docs/decisoes.md`](docs/decisoes.md): cada mudança passa pelo aluno e por uma mesa de avaliação com sete pontos de vista; os votos, os ajustes pedidos e as pendências ficam registrados.
 - [`analises/chave_imdb.py`](analises/chave_imdb.py): conferência automática da chave MovieLens → IMDb em todos os filmes, com a margem de erro dos gêneros e dos anos preenchidos (proposta 2-C). Substituiu a conferência à mão dos 38 filmes sem gênero mais avaliados.
 - [`analises/casos_sem_tratamento.py`](analises/casos_sem_tratamento.py): o que continua sem tratamento depois do IMDb e o peso de cada caso (D6). Com essa medição, a regra passou a ser: o que nenhuma regra automática trata e não pesa é excluído com justificativa, e os títulos cadastrados duas vezes são fundidos por regra, sem conferência à mão.
+- [`analises/pca_criterios.py`](analises/pca_criterios.py), [`analises/atributos_por_genero.py`](analises/atributos_por_genero.py) e [`analises/dimensao_por_genero.py`](analises/dimensao_por_genero.py): medições da revisão pedida pelo professor (D7): o PCA em min-max com os critérios para d′, o desvio-padrão da nota por gênero e a dimensão intrínseca do público de cada gênero.
 
 ## Reprodutibilidade
 
@@ -128,11 +129,11 @@ Os resultados não dependem da máquina nem do número de núcleos. O Spark devo
 - a amostra de notas (1.5-b, 2.4) é sorteada pelo hash de `userId` e `movieId`, e não pela divisão interna do Spark;
 - os quantis da seção 1 são exatos, não aproximados.
 
-Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os números de controle idênticos. Da v6 à v9 (19/11 e 25/11/2026), o Mac (8 núcleos) e o Colab (2 núcleos) deram os números de controle idênticos (16 na v6, 21 na v7, 22 na v8 e na v9). Só mudam os tempos da 3.9, que dependem da máquina, e a ordem em que aparecem itens empatados em duas listas: os votos do exemplo da 2.2-c e o décimo atributo mais frequente entre os atípicos da 3.7-a.
+Conferido em 18/11/2026 (v5): com os dados reais, as execuções com 8 e com 2 núcleos deram os números de controle idênticos. Da v6 à v9 (19/11 e 25/11/2026), o Mac (8 núcleos) e o Colab (2 núcleos) deram os números de controle idênticos (16 na v6, 21 na v7, 22 na v8 e na v9, 31 na v10). Só mudam os tempos da 3.9, que dependem da máquina, e a ordem em que aparecem itens empatados em duas listas: os votos do exemplo da 2.2-c e o décimo atributo mais frequente entre os atípicos da 3.7-a.
 
 ## Números de controle
 
-`scripts/numeros_controle.py` extrai 22 números que resumem a execução (avaliações, usuários, fusão e exclusão, preenchimento pelo IMDb, kNN, PCA, atípicos, Hopkins, grupos do perfil etc.) e compara duas execuções célula a célula. Na v9 executada no Colab em 25/11/2026: 24.998.518 avaliações nos dados tratados (das 25.000.095 originais), 162.541 usuários, 62.176 filmes no catálogo, 7 cópias fundidas, 240 filmes sem gênero excluídos, 4.822 filmes com gênero do IMDb, acerto do kNN de 83,38% nos filmes com 10 ou mais avaliadores, PCA base com 66,84% e 1.293 usuários atípicos, e vetor revisado com 17 grupos de gênero (IMAX fora, Animation e Children juntos) e PCA com 73,94%. A v9 também mede, da 3.5 à 3.9, o PCA com 80% da variância (9 componentes) como alternativa.
+`scripts/numeros_controle.py` extrai 31 números que resumem a execução (avaliações, usuários, IMAX, fusão e exclusão, preenchimento pelo IMDb, kNN, seleção de atributos, critérios do PCA, atípicos, Hopkins, grupos do perfil etc.) e compara duas execuções célula a célula. Na v10 executada em 26/11/2026: 24.998.518 avaliações nos dados tratados (das 25.000.095 originais), 162.541 usuários, 62.176 filmes no catálogo, IMAX retirado de 195 filmes (o único só com IMAX recebe gênero do IMDb), 7 cópias fundidas, 240 filmes sem gênero excluídos, 4.823 filmes com gênero do IMDb, acerto do kNN de 83,37% nos filmes com 10 ou mais avaliadores; vetor base com 19 atributos (limiar de 0,8), PCA em min-max com D2 = 6,17 e d′ = 7 (85,73%), broken-stick 3, e 1.156 usuários atípicos; vetor revisado com 17 grupos de gênero, desvio relativo por grupo, 32 atributos e PCA com 9 componentes (67,32%).
 
 ## Dados e licença
 

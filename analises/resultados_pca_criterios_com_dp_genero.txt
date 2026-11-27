@@ -1,0 +1,64 @@
+Perfil base: 162,541 usuários × 38 atributos (nota média, DP da nota, proporção e DP encolhido de cada gênero, sem IMAX)
+
+=== A. Autovalores (min-max, centralizado, covariância) ===
+ componente  autovalor em escala (%)  acumulada (%)  broken-stick (%)  acima do broken-stick  λ / média dos λ
+          1                   47.710         47.710            11.126                   True           18.130
+          2                   13.918         61.628             8.494                   True            5.289
+          3                    9.363         70.990             7.179                   True            3.558
+          4                    3.824         74.814             6.301                  False            1.453
+          5                    2.279         77.093             5.644                  False            0.866
+          6                    2.232         79.326             5.117                  False            0.848
+          7                    2.068         81.394             4.679                  False            0.786
+          8                    1.671         83.065             4.303                  False            0.635
+          9                    1.512         84.577             3.974                  False            0.574
+         10                    1.352         85.929             3.681                  False            0.514
+         11                    1.096         87.024             3.418                  False            0.416
+         12                    0.976         88.000             3.179                  False            0.371
+         13                    0.947         88.946             2.960                  False            0.360
+         14                    0.904         89.850             2.757                  False            0.343
+         15                    0.824         90.674             2.569                  False            0.313
+         16                    0.777         91.451             2.394                  False            0.295
+         17                    0.738         92.188             2.229                  False            0.280
+         18                    0.663         92.852             2.075                  False            0.252
+         19                    0.616         93.468             1.928                  False            0.234
+         20                    0.601         94.069             1.790                  False            0.229
+         21                    0.544         94.614             1.658                  False            0.207
+         22                    0.537         95.150             1.533                  False            0.204
+         23                    0.516         95.666             1.413                  False            0.196
+         24                    0.474         96.140             1.299                  False            0.180
+         25                    0.470         96.611             1.189                  False            0.179
+         26                    0.445         97.056             1.084                  False            0.169
+         27                    0.400         97.456             0.983                  False            0.152
+         28                    0.390         97.846             0.885                  False            0.148
+         29                    0.367         98.213             0.791                  False            0.139
+         30                    0.341         98.554             0.701                  False            0.129
+         31                    0.333         98.886             0.613                  False            0.126
+         32                    0.315         99.201             0.528                  False            0.120
+         33                    0.258         99.459             0.446                  False            0.098
+         34                    0.184         99.644             0.366                  False            0.070
+         35                    0.130         99.774             0.289                  False            0.050
+         36                    0.107         99.881             0.213                  False            0.041
+         37                    0.077         99.958             0.140                  False            0.029
+         38                    0.042        100.000             0.069                  False            0.016
+
+d′ por critério:
+  broken-stick, último autovalor acima: 3 (70.99% da variância)
+  broken-stick, regra da v9 (primeiros acima): 3 (70.99% da variância)
+  Kaiser-Guttman (λ / média ≥ 1): 4 (74.81% da variância)
+  80% da variância: 7 (81.39% da variância)
+  90% da variância: 15 (90.67% da variância)
+  dimensão de correlação D2 = 7.93 → ⌈D2⌉: 8 (83.07% da variância)
+  ρ-score = 3.53 → ⌈ρ⌉: 4 (74.81% da variância)
+  MLE = 16.05 → ⌈MLE⌉: 17 (92.19% da variância)
+
+=== B. Distribuição dos pares de distância (amostra fixa de 2.000 usuários) ===
+                                 espaço  dimensões  contraste relativo  variância relativa
+                 min-max (38 atributos)         38             20.3731              0.3763
+                  PCA (3): broken-stick          3            568.2639              0.5282
+PCA (4): Kaiser-Guttman (λ / média ≥ 1)          4            308.4400              0.4986
+              PCA (7): 80% da variância          7            118.1751              0.4591
+             PCA (15): 90% da variância         15             26.9779              0.4118
+     PCA (8): dimensão de correlação D2          8             71.0780              0.4490
+                          PCA (17): MLE         17             26.0363              0.4053
+
+Figura: analises/pca_criterios_distancias_com_dp_genero.png

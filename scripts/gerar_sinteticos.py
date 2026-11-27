@@ -11,7 +11,8 @@ multirrótulo), inclui de propósito os casos de borda que o notebook precisa tr
 - filmes sem gênero que o IMDb não resolve (só 'Short', sem gênero ou código ausente): só entre os pouco avaliados,
   como nos dados reais, para que a exclusão da 2.2-d passe no critério de 'não pesa';
 - refilmagem (mesmo nome, anos diferentes);
-- IMAX quase sempre acompanhado de outro gênero.
+- IMAX quase sempre acompanhado de outro gênero; o único filme só com IMAX fica sem gênero quando o IMAX sai (2.2)
+  e recebe gênero do IMDb (2.2-b), como o filme 4460 nos dados reais.
 O sinal de gênero é forte o bastante para a imputação passar da moda, para que esse trecho do código seja exercitado.
 """
 import argparse
@@ -173,6 +174,8 @@ def recorte_imdb(movies, links, avaliacoes, rng, max_sem_tratamento=3):
                                                      replace=False)))
         else:
             gs = [("Family" if g == "Children" and rng.random() < 0.6 else g) for g in filme["genres"].split("|") if g != "IMAX"]
+            if not gs:  # filme só com IMAX: o IMDb tem os gêneros dele (o filme 4460 real tem Adventure, Comedy e Drama)
+                gs = ["Adventure", "Comedy", "Drama"]
             if rng.random() < 0.1:
                 gs.append("Biography")
             generos = ",".join(sorted(gs)[:3]) or None

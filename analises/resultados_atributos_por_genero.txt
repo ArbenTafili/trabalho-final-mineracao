@@ -1,0 +1,32 @@
+Usuários: 162,541; gêneros sem IMAX: 18; encolhimento com m = 5
+
+=== A e B. Cobertura e redundância dos atributos por gênero ===
+     gênero  % usuários com 1+  % com 2+ (desvio)  % com 5+  corr média_g × média (5+)  corr dp_g × dp (5+)  corr afinidade × média (5+)  corr média encolhida × média (todos 1+)  corr dp encolhido × dp (todos 1+)
+      Drama             99.986             99.946    98.943                      0.902                0.837                       -0.165                                    0.940                              0.900
+     Comedy             99.902             99.558    96.078                      0.888                0.832                        0.043                                    0.937                              0.904
+     Action             99.652             98.810    93.026                      0.856                0.796                        0.052                                    0.915                              0.881
+   Thriller             99.635             98.701    92.352                      0.868                0.789                       -0.030                                    0.927                              0.880
+  Adventure             99.557             98.343    90.505                      0.847                0.777                        0.039                                    0.914                              0.874
+    Romance             99.094             96.862    82.847                      0.841                0.738                       -0.020                                    0.920                              0.862
+      Crime             98.963             96.558    83.299                      0.831                0.714                       -0.104                                    0.915                              0.847
+     Sci-Fi             98.475             95.081    78.142                      0.825                0.736                        0.040                                    0.907                              0.853
+    Fantasy             96.474             89.688    66.127                      0.814                0.709                        0.044                                    0.908                              0.846
+    Mystery             93.643             83.607    55.679                      0.813                0.675                       -0.111                                    0.915                              0.842
+   Children             91.295             81.013    55.134                      0.759                0.635                        0.104                                    0.879                              0.823
+        War             90.380             77.416    44.794                      0.766                0.606                       -0.118                                    0.903                              0.831
+     Horror             87.021             71.178    42.249                      0.750                0.636                        0.049                                    0.884                              0.828
+  Animation             86.271             72.991    45.000                      0.730                0.607                       -0.002                                    0.871                              0.817
+    Musical             77.601             60.239    31.303                      0.739                0.600                        0.024                                    0.890                              0.828
+    Western             67.698             44.002    17.544                      0.769                0.578                       -0.013                                    0.920                              0.859
+  Film-Noir             41.743             23.621     8.672                      0.680                0.436                       -0.191                                    0.891                              0.844
+Documentary             37.156             21.678     9.400                      0.670                0.455                       -0.037                                    0.873                              0.817
+
+Resumo das correlações (mediana entre os gêneros):
+% usuários com 1+                          95.058
+% com 2+ (desvio)                          86.647
+% com 5+                                   60.903
+corr média_g × média (5+)                   0.813
+corr dp_g × dp (5+)                         0.692
+corr afinidade × média (5+)                -0.008
+corr média encolhida × média (todos 1+)     0.911
+corr dp encolhido × dp (todos 1+)           0.847

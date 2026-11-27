@@ -2,9 +2,9 @@
 
 Este documento reúne num lugar só as justificativas de todas as decisões do trabalho final de Mineração de Dados sobre o MovieLens 25M. O trabalho segue o processo KDD (*Knowledge Discovery in Databases*: seleção → pré-processamento → transformação → mineração → interpretação), e o notebook vai até a seção 3 (Transformação). É a versão consolidada e legível de [`docs/decisoes.md`](decisoes.md), que guarda o registro detalhado: votos da mesa de avaliação, ajustes pedidos e contas. O aluno pediu este documento ao aceitar a D6, em 19/11/2026.
 
-**Como ler.** As decisões aparecem na ordem do processo KDD: seleção (seção 1 do notebook), pré-processamento (seção 2) e transformação (seção 3). Depois vêm as decisões de infraestrutura. Cada decisão segue o mesmo roteiro: o que foi decidido, por quê (com os números reais), alternativas descartadas, limitações, onde está a evidência e status. Quando a decisão mudou com o tempo, um item "Como chegou aqui" conta a sequência e diz o que vale hoje. Os códigos D1 a D6, 2-B e 2-C remetem ao registro em `docs/decisoes.md`; números como 2.2-b remetem às seções do notebook.
+**Como ler.** As decisões aparecem na ordem do processo KDD: seleção (seção 1 do notebook), pré-processamento (seção 2) e transformação (seção 3). Depois vêm as decisões de infraestrutura. Cada decisão segue o mesmo roteiro: o que foi decidido, por quê (com os números reais), alternativas descartadas, limitações, onde está a evidência e status. Quando a decisão mudou com o tempo, um item "Como chegou aqui" conta a sequência e diz o que vale hoje. Os códigos D1 a D7, 2-B e 2-C remetem ao registro em `docs/decisoes.md`; números como 2.2-b remetem às seções do notebook.
 
-Os números são os da v8, executada com os dados reais em 25/11/2026 no Mac (`execucoes/real_v8.ipynb`) e no Colab (a versão entregue), com os 22 números de controle idênticos nas duas, salvo indicação. A v8 mudou só a célula 3.8-a (decisão 24); da seção 1 até a 3.7, os números são os mesmos da v7. A seção 1 descreve os dados-alvo antes da fusão e da exclusão da v7. Os tempos da 3.9 dependem da máquina e não são citados aqui. Os termos técnicos são explicados na primeira vez em que aparecem e, de novo, no [glossário](#glossario).
+Os números são os da v10, executada com os dados reais em 26/11/2026 no Mac (`execucoes/real_v10.ipynb`) e no Colab (a versão entregue), com os 31 números de controle idênticos nas duas, salvo indicação. A v10 implementa a revisão pedida pelo professor (D7): IMAX fora na limpeza, PCA em min-max com quatro critérios para d′, desvio-padrão da nota por gênero, limiar de redundância de 0,8 e coordenadas paralelas com 100 usuários. As decisões de 1 a 16 mudam só em números pequenos (o filme que só tinha IMAX passa a ser preenchido pelo IMDb). A seção 1 descreve os dados-alvo antes da fusão e da exclusão da v7. Os tempos da 3.9 dependem da máquina e não são citados aqui. Os termos técnicos são explicados na primeira vez em que aparecem e, de novo, no [glossário](#glossario).
 
 ## Índice
 
@@ -31,14 +31,14 @@ Os números são os da v8, executada com os dados reais em 25/11/2026 no Mac (`e
 | 15 | [Amostras só para gráficos, com representatividade conferida](#d15) | 1.5-b, 2.4 | implementada (v5; sorteio pelo hash na v6) |
 | 16 | [Não imputar a matriz usuário × filme](#d16) | 2.5 | implementada (v5) |
 | | **Transformação (seção 3)** | | |
-| 17 | [Perfil por usuário em proporções](#d17) | 3.1 | implementada (v5) |
-| 18 | [Seleção de características por filtro, com limiar de 0,9](#d18) | 3.2 | implementada (v5) |
-| 19 | [Escala: z-score como base, min-max como alternativa](#d19) | 3.3 | implementada (v5) |
-| 20 | [PCA do vetor base com 6 componentes](#d20) | 3.4 a 3.6 | implementada (v5); hoje é comparação |
+| 17 | [Perfil por usuário: proporções e desvio-padrão da nota por gênero](#d17) | D7; 3.1 | implementada (v5; desvio por gênero na v10) |
+| 18 | [Seleção de características por filtro, com limiar de 0,8](#d18) | D7; 3.2, 3.8-a | implementada (v5; limiar de 0,8 na v10) |
+| 19 | [Escala: min-max como base do PCA; z-score só para comparação](#d19) | D7; 3.3 a 3.9 | implementada (v5; min-max como base na v10) |
+| 20 | [PCA do vetor base: quatro critérios para d′ e 7 componentes pela dimensão intrínseca](#d20) | D7; 3.4 a 3.5-c | implementada (v5; refeita na v10); é comparação |
 | 21 | [Atípicos mantidos e marcados](#d21) | 3.7-a | implementada (v5) |
 | 22 | [Seguir para o agrupamento, esperando separação fraca](#d22) | 3.7-b | implementada (v5) |
-| 23 | [Vetor revisado e seu PCA como entrada principal de P1](#d23) | 3.8, 3.10 | implementada (v5; grupos do perfil na v8) |
-| 24 | [Grupos do perfil: IMAX fora, Animation e Children juntos](#d24) | D5, D4; 3.8-a | implementada (v8) |
+| 23 | [Vetor revisado e seu PCA como entrada principal de P1](#d23) | D7; 3.8, 3.10 | implementada (v5; grupos do perfil na v8; desvios relativos na v10) |
+| 24 | [Grupos do perfil: IMAX fora, Animation e Children juntos](#d24) | D5, D4, D7; 2.2, 3.8-a | implementada (v8; IMAX fora na 2.2 desde a v10) |
 | 25 | [Solução indexada para buscas por similaridade](#d25) | 3.9 | implementada (v5) |
 | | **Infraestrutura** | | |
 | 26 | [Repositório: fontes em `fonte/`, testes locais e execução final no Colab](#d26) | D1; README | implementada (v6; ampliada na v7) |
@@ -329,19 +329,19 @@ Sem gênero em comum, as cópias ficam separadas, mesmo com o código TMDb igual
 2. *D2 (18/11/2026), mesa de 5:* proposta de preencher com uma regra de contagem no lugar do kNN. A regra soma as avaliações que o público do filme deu a cada gênero e divide pela raiz do número de filmes do gênero (peso 1/√N). Votos: 3 aprovam com ajuste, 2 rejeitam (estatístico e especialista em recomendação, porque a regra provavelmente acertaria menos que o kNN). Na primeira medição por faixa de avaliadores, a regra não passou 10 pontos acima do chute em nenhuma faixa, e o kNN passou a partir de 5 avaliadores.
 3. *D2, rodada 2 (18/11/2026), 5 de 5 aprovam com ajuste:* o kNN continua. O mínimo de avaliadores deixa de ser fixo (10) e passa a ser calculado pelo código: é a menor faixa a partir da qual todas as faixas superiores superam o chute por pelo menos 10 pontos. Na medição exploratória, o mínimo calculado foi 5. Mesmo assim, cerca de 4 mil filmes continuariam `Unknown`.
 4. *Proposta 2-B (18/11/2026), mesa de 7 (6 aprovam com ajuste, 1 aprova):* o aluno perguntou se esses filmes não poderiam ser preenchidos. Com 1–2 avaliadores, nenhum método baseado no público supera o chute: é falta de informação. A proposta foi usar o IMDb como fonte principal e o kNN como método de mineração, validado contra o IMDb.
-5. *v6 (19/11/2026):* implementado na 2.2-b (IMDb) e na 2.2-c (kNN validado). Como o IMDb preenche 4.822 dos 5.062 filmes sem gênero e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não foi usado para preencher.
+5. *v6 (19/11/2026):* implementado na 2.2-b (IMDb) e na 2.2-c (kNN validado). Como o IMDb preenche 4.823 dos 5.063 filmes sem gênero (desde a v10, com o filme que só tinha IMAX) e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não foi usado para preencher.
 6. *v7 (19/11/2026):* os 240 restantes são excluídos na 2.2-d, sem kNN (decisão 14). A D2 está registrada como superada.
 
 **Por quê.**
-- *Cobertura:* o IMDb preenche 4.822 dos 5.062 filmes sem gênero (95%), com 25.221 das 26.627 avaliações desses filmes. O kNN só funciona com público suficiente.
+- *Cobertura:* o IMDb preenche 4.823 dos 5.063 filmes sem gênero (95%), com 25.248 das 26.654 avaliações desses filmes. O kNN só funciona com público suficiente.
 - *As fontes concordam:* nos 57.099 filmes com gênero nas duas (depois da fusão da 2.2-a), 97,7% têm pelo menos um gênero em comum; os conjuntos são idênticos em 46,9%, e o Jaccard médio é 0,719. (O índice de Jaccard é o número de gêneros em comum dividido pelo número de gêneros distintos dos dois lados.)
-- *Validação interna do kNN:* na validação cruzada de 5 partes (treina em 4/5 dos filmes, testa no 1/5 restante e repete cinco vezes), nos 24.006 filmes com gênero e 10 ou mais avaliadores, o kNN acerta 83,38%, contra 47,3% de chutar Drama. O Naive Bayes (classificador probabilístico simples) acerta 69,6%. Seu erro, de 30,4%, é a taxa de ruído de referência: o kNN só compensa se errar menos que isso, e erra 16,6%.
-- *Por faixa:* o acerto do kNN cresce com o público do filme: 38,2% com 1–2 avaliadores, 55,4% com 3–4, 67,8% com 5–9, 78,0% com 10–49 e 87,8% com 50 ou mais. Com 1–2, fica 4,5 pontos abaixo do chute.
-- *Validação externa:* nos próprios filmes sem gênero, o kNN concorda com o IMDb em 66,6% (5–9 avaliadores), 70,9% (10–49) e 80,6% (50 ou mais), contra 48,7% a 58,3% do chute. O comportamento dos usuários contém a informação de gênero e confirma o IMDb.
-- *Efeito nas distribuições (2.6):* `Unknown` deixa de existir: 4.822 filmes (25.221 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes); o V de Cramér muda no máximo 0,0001.
+- *Validação interna do kNN:* na validação cruzada de 5 partes (treina em 4/5 dos filmes, testa no 1/5 restante e repete cinco vezes), nos 24.005 filmes com gênero e 10 ou mais avaliadores, o kNN acerta 83,37%, contra 47,3% de chutar Drama. O Naive Bayes (classificador probabilístico simples) acerta 71,1%. Seu erro, de 28,9%, é a taxa de ruído de referência: o kNN só compensa se errar menos que isso, e erra 16,6%.
+- *Por faixa:* o acerto do kNN cresce com o público do filme: 38,4% com 1–2 avaliadores, 55,5% com 3–4, 67,7% com 5–9, 77,9% com 10–49 e 87,9% com 50 ou mais. Com 1–2, fica 4,2 pontos abaixo do chute.
+- *Validação externa:* nos próprios filmes sem gênero, o kNN concorda com o IMDb em 67,1% (5–9 avaliadores), 71,4% (10–49) e 75,0% (50 ou mais), contra 48,9% a 58,3% do chute. O comportamento dos usuários contém a informação de gênero e confirma o IMDb.
+- *Efeito nas distribuições (2.6):* `Unknown` deixa de existir: 4.823 filmes (25.248 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes); o V de Cramér muda no máximo 0,0001.
 
 **O papel da 2.2-c.** A 2.2-c não preenche nenhum valor. Ela é a evidência por trás de três decisões:
-1. *manter o gênero vindo do IMDb (esta decisão):* o comportamento dos usuários concorda com o IMDb a partir de 5 avaliadores (66,6% a 80,6%, contra 48,7% a 58,3% do chute);
+1. *manter o gênero vindo do IMDb (esta decisão):* o comportamento dos usuários concorda com o IMDb a partir de 5 avaliadores (67,1% a 75,0%, contra 48,9% a 58,3% do chute);
 2. *deixar a contagem 1/√N só como comparação (D2, esta decisão):* na mesma validação, ela fica bem abaixo do kNN em todas as faixas;
 3. *excluir os 240 filmes restantes sem kNN (decisão 14):* a 2.2-c mostra que o kNN só funciona com 5 ou mais avaliadores, numa população de filmes com gênero, quase todos longas; os 55 filmes com público suficiente são quase todos curtas.
 
@@ -363,7 +363,7 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 - O IMDb lista no máximo três gêneros e usa menos Thriller. Os filmes preenchidos têm 1,78 gênero por filme (contra 1,87), Thriller em 7,4% (contra 15,1%), Drama em 52,5% (contra 44,6%) e Musical em 3,1% (contra 1,8%).
 - Os filmes preenchidos têm notas menores que a média do gênero (Drama 3,43 contra 3,68; Comedy 3,21 contra 3,42), porque são pouco vistos. Pesam no máximo 0,87% das avaliações de um gênero (Documentary).
 - Uma chave errada traz o gênero de outro título (decisão 12).
-- O acerto de 83,38% da v7 difere do 83,35% da v6 porque a fusão muda as partes da validação cruzada.
+- O acerto de 83,38% da v7 difere do 83,35% da v6 porque a fusão muda as partes da validação cruzada. Na v10, com o IMAX fora das classes, é 83,37%, e o Naive Bayes sobe de 69,6% para 71,1%.
 - Os números de `analises/` e os do notebook diferem um pouco. O kNN exploratório usa a proporção de gêneros do público, e não a média dos perfis usada no notebook. Na regra 1/√N, o N foi medido no catálogo inteiro na primeira medição e só nos filmes de treino na segunda. Os números do notebook são os da versão implementada.
 
 **Onde está a evidência.** 2.2-b, 2.2-c, 2.6; `analises/imputacao_por_faixa.py` → `analises/resultados_imputacao_por_faixa.txt`; `analises/imdb.py` → `analises/resultados_imdb.txt`; `docs/decisoes.md` (D2, rodada 2 e 2-B).
@@ -400,7 +400,7 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 
 *Registro: D2, proposta 2-C. Notebook: leitura da 2.2-b. Análise: `analises/chave_imdb.py`.*
 
-**O que foi decidido.** A chave (o código IMDb que a tabela `links` dá para cada filme) é conferida por código em todos os filmes, e não filme a filme. Nenhum filme é excluído por essa conferência: os 4.822 gêneros vindos do IMDb ficam, e a margem de erro é declarada.
+**O que foi decidido.** A chave (o código IMDb que a tabela `links` dá para cada filme) é conferida por código em todos os filmes, e não filme a filme. Nenhum filme é excluído por essa conferência: os 4.823 gêneros vindos do IMDb ficam, e a margem de erro é declarada.
 
 **Como chegou aqui.**
 1. A D2 previa conferir à mão, no IMDb, os 38 filmes sem gênero mais avaliados (50 ou mais avaliações) e usá-los como teste externo.
@@ -415,7 +415,7 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 - *Margem de erro dos gêneros:* o controle comparável são os 29.412 filmes que entraram no catálogo na mesma época dos preenchidos (movieId acima de 131.262), com concordância de 97,01% e chave sorteada de 35,37%. Separando pelo sinal de ano e pesando pelas avaliações, cerca de 5,0% dos gêneros preenchidos (240 filmes) e 5,4% das avaliações deles (1.359; 0,0054% do total) podem vir de chave errada. Esses 240 não são os 240 filmes da decisão 14: aqueles nem receberam gênero.
 - *Margem dos anos:* no controle sem ano no MovieLens, 135 de 147 concordam (intervalo de confiança de 95%, ou IC 95%, de 86,3% a 95,3%). Cerca de 56 dos 409 anos preenchidos podem estar errados (até 94).
 - *Por usuário:* 7.793 usuários avaliaram algum filme preenchido. No mais exposto, esses filmes são 10,7% das avaliações, o que dá cerca de 0,58 ponto percentual com gênero possivelmente errado; 102 usuários passam de 5%.
-- *Peso total:* mesmo que os 4.822 gêneros estivessem todos errados, seriam 0,10% das avaliações (voto do cientista de dados).
+- *Peso total:* mesmo que os 4.823 gêneros estivessem todos errados, seriam 0,10% das avaliações (voto do cientista de dados).
 
 **A lista dos 14.** Dos 38 filmes sem gênero com 50 ou mais avaliações, o código separa os 14 que não passam em "título igual, ano igual ou com 1 ano de diferença, tipo filme". Para cada um, mostra título, ano e tipo do IMDb lado a lado e os outros filmes do MovieLens com o mesmo título. Nenhum gênero muda.
 - 11 se resolvem pela própria linha: séries sem ano no MovieLens (Cosmos, The OA, Death Note, Cosmos: A Spacetime Odyssey, 13 Reasons Why), traduções e títulos alternativos (Fantastic Beasts 2 = The Crimes of Grindelwald; 120 BPM; Somnio = Infinity Chamber), Paterson (sem ano no MovieLens), um episódio e um especial com título igual.
@@ -561,107 +561,124 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 
 <a id="d17"></a>
 
-### 17. Perfil por usuário em proporções
+### 17. Perfil por usuário: proporções e desvio-padrão da nota por gênero
 
-*Notebook: 1.6, 3.1, 3.1-b.*
+*Registro: D7 (item 4). Notebook: 1.6, 3.1, 3.1-b.*
 
-**O que foi decidido.** Cada usuário vira uma linha (instância), com atributos em proporção e denominador explícito: proporção das avaliações em cada um dos 19 gêneros (denominador: avaliações do usuário), nota média, desvio-padrão da nota, proporção de notas positivas e participação no total de avaliações.
+**O que foi decidido.** Cada usuário vira uma linha (instância), com atributos em proporção e denominador explícito: proporção das avaliações em cada um dos 18 gêneros (denominador: avaliações do usuário), nota média, desvio-padrão da nota, proporção de notas positivas e participação no total de avaliações. Desde a v10, o perfil tem também o **desvio-padrão da nota em cada gênero** (`dp_<gênero>`): o desvio das notas que o usuário deu aos filmes do gênero, calculado só quando há 2 ou mais avaliações nele. Esse desvio aparece na figura "Atributos do perfil por usuário" (3.1-b) e descreve o perfil; não entra no vetor base (decisão 18) e entra no vetor revisado numa forma relativa, definida para todos os usuários (decisão 23).
 
 **Por quê.**
 - O volume é muito assimétrico: o número de avaliações por usuário tem assimetria de 16,3 (média 153,8, mediana 71), e o mais ativo tem 32.202 avaliações. Contagens brutas mediriam atividade, não gosto; proporções comparam usuários com volumes diferentes (1.6).
 - Em média, 44,3% das avaliações de um usuário são de Drama, 34,8% de Comedy e 31,4% de Action.
+- *Desvio por gênero:* ao ver o histograma de `nota_dp` nessa figura, o professor pediu o mesmo desvio para cada gênero. O desvio existe para 99,9% dos usuários em Drama, mas só para 21,7% em Documentary e 23,6% em Film-Noir. A média vai de 0,63 (Film-Noir) a 0,93 (Comedy), sempre abaixo ou igual ao desvio geral médio (0,93): dentro de um gênero, o usuário varia as notas um pouco menos do que no conjunto. A conferência recalcula o desvio de Drama do primeiro usuário a partir das 53 notas dele.
 
-**Alternativas descartadas.** *Contagens brutas por gênero:* seriam dominadas pela atividade do usuário.
+**Alternativas descartadas.**
+- *Contagens brutas por gênero:* seriam dominadas pela atividade do usuário.
+- *Desvio por gênero completado com o desvio geral onde falta (ou puxado para ele):* fica com correlação de 0,82 a 0,90 com `nota_dp` em todos os 18 gêneros (`analises/atributos_por_genero.py`); repetiria o desvio geral.
 
-**Limitações.** As proporções de gênero de um usuário somam mais que 1, porque um filme pode ter vários gêneros. O vetor revisado corrige isso com a contagem fracionária (decisão 23).
+**Limitações.** As proporções de gênero de um usuário somam mais que 1, porque um filme pode ter vários gêneros; o vetor revisado corrige isso com a contagem fracionária (decisão 23). O desvio por gênero é instável com poucas avaliações: os valores zero (mesma nota para todos os filmes do gênero) chegam a 6,6% em Animation, quase sempre com 2 ou 3 avaliações.
 
-**Onde está a evidência.** 1.6, 3.1, 3.1-b.
+**Onde está a evidência.** 1.6, 3.1, 3.1-b; `analises/atributos_por_genero.py`.
 
-**Status.** Implementada desde a v5.
+**Status.** Implementada desde a v5. Na v10 (26/11/2026), com o IMAX fora (decisão 24), o perfil tem 18 gêneros, e o desvio por gênero entrou no perfil.
 
 <a id="d18"></a>
 
-### 18. Seleção de características por filtro, com limiar de 0,9
+### 18. Seleção de características por filtro, com limiar de 0,8
 
-*Notebook: 3.2, 3.10.*
+*Registro: D7 (item 5). Notebook: 3.2, 3.8-a, 3.10.*
 
-**O que foi decidido.** A seleção de características (escolher quais atributos entram na entrada de P1) usa a abordagem de **filtro**: mede a redundância entre pares de atributos, sem depender de um algoritmo. Um par é redundante quando |Pearson| e |Spearman| são ambos ≥ 0,9. Resultado: sai `prop_positivas` (redundante com `nota_media`), e `prop_avaliacoes_total` fica fora da distância. A entrada candidata tem 21 atributos (nota média, desvio-padrão e 19 proporções de gênero).
+**O que foi decidido.** A seleção de características (escolher quais atributos entram na entrada de P1) usa a abordagem de **filtro**: mede a redundância entre pares de atributos, sem depender de um algoritmo. Um par é redundante quando |Pearson| e |Spearman| são ambos ≥ 0,8. Dois atributos têm decisão própria: `prop_positivas` sai (repete a nota média e depende de um limiar ainda a validar, decisão 4) e `prop_avaliacoes_total` fica fora da distância (mede atividade). Nos demais pares redundantes, a regra é automática: sai o atributo com maior |Pearson| médio com os demais. Resultado:
+- *vetor base:* sai `prop_children` (Animation × Children: Pearson 0,823; Spearman 0,804; |Pearson| médio 0,267 contra 0,227 de Animation). A entrada candidata tem 19 atributos: nota média, desvio-padrão e 17 proporções de gênero;
+- *vetor revisado (3.8-a):* sai `nota_media` (com o viés do usuário: 0,903 e 0,881).
 
 **Por quê.**
 - O filtro independe do método de aprendizado. *Wrappers* e *embedded* (que escolhem atributos testando um algoritmo) acrescentariam um segundo viés.
-- Sem classe, do CFS (que busca atributos ligados à classe e pouco ligados entre si) só a segunda parte se aplica.
-- Só o par `nota_media` × `prop_positivas` passou do limiar (Pearson 0,922; Spearman 0,946). Fica o atributo que usa a escala completa da nota; `prop_positivas` também depende de um limiar ainda a validar (decisão 4).
-- `prop_avaliacoes_total` mede atividade, é muito assimétrico e dominaria a distância; serve para descrever os grupos.
-- O segundo par mais associado, `prop_animation` × `prop_children` (0,823 / 0,804), ficou abaixo do limiar, e os dois foram mantidos no vetor base. No vetor revisado, eles foram juntados por uma escolha de taxonomia, não por redundância (decisão 24).
+- Sem classe, do CFS (que busca atributos ligados à classe e pouco ligados entre si) só a segunda parte se aplica: os pares ordenados por |correlação|. O CFS não fixa limiar; o 0,8 é uma escolha do projeto, sugerida pelo professor depois de ver os pares.
+- Sai o atributo de maior |Pearson| médio porque é o que mais repete o resto do perfil. No vetor base, Animation fica e representa o público de animação e infantil; no vetor revisado, os dois formam um grupo (decisão 24). No revisado, o viés fica: guarda o rigor do usuário sem o efeito dos filmes escolhidos.
+- O terceiro par mais associado do vetor base, Action × Adventure (0,674 e 0,694), fica longe do limiar.
+
+**Como chegou aqui.** Da v5 à v9, o limiar era 0,9: só `nota_media × prop_positivas` passava, e Animation × Children (0,823 / 0,804) ficava; a entrada candidata tinha 21 atributos (com IMAX). Na revisão de 26/11/2026, o professor sugeriu rever com 0,8 (D7); a v10 aplica o novo limiar com a regra automática.
 
 **Alternativas descartadas.**
 - *Wrappers e embedded:* dependem do algoritmo.
 - *Fisher e ReliefF:* exigem classe. Depois de P1, podem usar os grupos como classe para descrever o que os separa, não para escolher a entrada.
+- *Manter 0,9:* deixaria no vetor base dois atributos com mais de 0,8 de correlação nos dois critérios.
 
-**Limitações.** O limiar de 0,9 é uma escolha explícita e pode ser revisto.
+**Limitações.** O limiar é uma escolha explícita. Entre Animation e Children, a escolha depende de uma diferença pequena de |Pearson| médio (0,267 contra 0,227).
 
-**Onde está a evidência.** 3.2, 3.10.
+**Onde está a evidência.** 3.2, 3.8-a, 3.10.
 
-**Status.** Implementada desde a v5. Na v7, sem `prop_unknown`, a entrada candidata passou de 22 para 21 atributos.
+**Status.** Implementada desde a v5. Na v7, sem `prop_unknown`, a entrada passou de 22 para 21 atributos; na v10, com o IMAX fora e o limiar de 0,8, para 19.
 
 <a id="d19"></a>
 
-### 19. Escala: z-score como base, min-max como alternativa
+### 19. Escala: min-max como base do PCA; z-score só para comparação
 
-*Notebook: 3.3, 3.4, 3.5, 3.10.*
+*Registro: D7 (item 1). Notebook: 3.3 a 3.9.*
 
-**O que foi decidido.** A matriz padronizada por **z-score** (subtrair a média e dividir pelo desvio-padrão de cada atributo) é a base do PCA e a entrada candidata interpretável. A re-escala **min-max** (levar cada atributo para [0, 1]) fica como alternativa (`X_p1_minmax`).
+**O que foi decidido.** A partir de 3.4, tudo usa a matriz **min-max** (cada atributo levado para [0, 1]): PCA, distâncias, dimensão intrínseca, Hopkins e índices. O **z-score** (subtrair a média e dividir pelo desvio-padrão) fica só como comparação em 3.3 e no critério univariado |z| > 3 de 3.7-a.
 
 **Por quê.**
-- A escala muda o peso de cada atributo na distância entre usuários e no PCA.
-- No z-score, cada atributo tem o mesmo peso na variância total (4,76%).
-- No min-max, os gêneros frequentes dominam a distância: Action pesa 11,54% e Drama 10,12%, contra 0,23% de Documentary.
-- Na amostra de 2.000 usuários, o min-max é o espaço que mais concentra as distâncias (variância relativa 0,3590, contra 0,3740 no z-score e 0,4259 no PCA). Distâncias concentradas (a menor e a maior ficam proporcionalmente próximas) prejudicam os métodos baseados em distância.
+- É o procedimento do PCA pedido pelo professor: escalar cada dimensão por min-max, centralizar na média e extrair os autovalores da matriz de covariância.
+- O z-score dá aos gêneros raros, de pouca variação, o mesmo peso dos comuns e cria valores extremos: máximos de 47,1 desvios-padrão em Documentary, 38,9 em Western e 38,2 em Film-Noir, e 854 casos de |z| > 10.
+- Com o z-score, os últimos autovalores do PCA voltavam a ficar acima da curva broken-stick, o "fim estranho" que o professor apontou. Com min-max e covariância, nenhum autovalor do vetor base cruza a curva depois dos três primeiros.
+- O min-max preserva a diferença de variância entre atributos: Action pesa 12,62% e Drama 11,07% da variância total, contra 0,25% de Documentary.
 
-**Alternativas descartadas.** *Min-max como escala principal:* deixa os gêneros frequentes decidirem a distância e concentra mais as distâncias.
+**Como chegou aqui.** Da v5 à v9, o z-score era a base do PCA (cada atributo com o mesmo peso, 4,76% na v9), e o min-max era alternativa, por ser o espaço que mais concentrava as distâncias (variância relativa 0,359, contra 0,374 no z-score). Na revisão de 26/11/2026, o professor indicou o procedimento com min-max e covariância (D7); a v10 o adota.
 
-**Limitações.** O z-score amplia os gêneros raros: máximos de 47,1 em Documentary, 38,9 em Western e 38,2 em Film-Noir. O vetor revisado trata isso agrupando os gêneros raros (decisão 23).
+**Alternativas descartadas.** *z-score como base:* amplia os gêneros raros, cria extremos e produz o cruzamento no fim do broken-stick.
 
-**Onde está a evidência.** 3.3, 3.5, 3.10.
+**Limitações.** O min-max depende do maior e do menor valor de cada atributo (um usuário extremo define a escala), e os gêneros frequentes decidem mais a distância. A matriz min-max concentra as distâncias mais que os espaços PCA (variância relativa 0,355, contra 0,391 no PCA principal).
 
-**Status.** Implementada desde a v5.
+**Onde está a evidência.** 3.3, 3.4, 3.5.
+
+**Status.** Implementada desde a v5 com o z-score; min-max como base desde a v10 (26/11/2026).
 
 <a id="d20"></a>
 
-### 20. PCA do vetor base com 6 componentes
+### 20. PCA do vetor base: quatro critérios para d′ e 7 componentes pela dimensão intrínseca
 
-*Notebook: 3.4, 3.5, 3.5-b, 3.6, 3.7-b, 3.8-b, 3.9.*
+*Registro: D7 (itens 1, 2 e 10, e o esclarecimento do aluno). Notebook: 3.4, 3.5, 3.5-b, 3.5-c, 3.6, 3.7, 3.8-b, 3.9.*
 
-**O que foi decidido.** O **PCA** (análise de componentes principais: troca os atributos por combinações deles, ordenadas pela variância que explicam) é aplicado à matriz padronizada. O número de componentes, d′ = 6, vem do critério de Kaiser-Guttman (ficar com os componentes de autovalor ≥ 1). A matriz PCA é uma entrada a comparar em P1, não uma substituição obrigatória dos 21 atributos. O critério de 80% da variância (9 componentes) fica como alternativa a testar em P1.
+**O que foi decidido.** O **PCA** (análise de componentes principais: troca os atributos por combinações deles, ordenadas pela variância que explicam) é aplicado à matriz min-max, centralizada, com os autovalores da covariância. O número de componentes d′ é escolhido por quatro critérios, de três tipos:
+- **gráfico:** o scree plot com a variância acumulada; d′ = componentes que somam 80% da variância;
+- **estatístico:** broken-stick (os componentes iniciais acima da variância esperada ao acaso) e Kaiser-Guttman (autovalores maiores ou iguais à média dos autovalores, o limiar unitário em escala);
+- **dimensão intrínseca:** dimensão de correlação (fractal) D2 e ρ-score, estimadas pelas distâncias entre usuários; d′ = ⌈D⌉.
+
+Regra fixada antes da execução: o PCA principal usa d′ = ⌈D2⌉; o broken-stick, o mais compacto, é a alternativa. Resultado: **7 componentes (85,73% da variância)**; a alternativa tem 3 (64,91%).
+
+| Critério | d′ | variância retida |
+|---|---:|---:|
+| broken-stick | 3 | 64,91% |
+| Kaiser-Guttman | 4 | 72,46% |
+| ρ-score = 3,95 | 4 | 72,46% |
+| 80% da variância | 6 | 82,07% |
+| D2 = 6,17 | 7 | 85,73% |
 
 **Por quê.**
-- Os critérios discordam: Kaiser-Guttman dá 6 componentes (66,84% da variância); o broken-stick (ficar com os componentes que superam a variância esperada ao acaso) dá 2; e 80% da variância acumulada dá 9. Cada um tem seu viés, e os três ficam registrados.
-- A dimensionalidade intrínseca (quantas dimensões efetivas descrevem os dados, estimada pelo método de Levina–Bickel) é de cerca de 13 no espaço z de 21 atributos (12,7 a 14,1, conforme o número de vizinhos usado) e de 6,4 no espaço PCA de 6 componentes. Há redundância, mas a estrutura não cabe em 2 ou 3 dimensões.
-- O espaço PCA é o que menos concentra as distâncias (contraste relativo 110,66; variância relativa 0,4259).
-- Os dois primeiros componentes explicam 39,68%. As projeções 2D (PCA, MDS e t-SNE) mostram uma nuvem contínua, sem grupos isolados.
+- O professor pediu o PCA com broken-stick, com Kaiser-Guttman, com a dimensão intrínseca e "até mais 1" critério; pela organização dos critérios em três tipos, o quarto é o gráfico (esclarecimento do aluno, D7).
+- A dimensão intrínseca mede a estrutura dos dados pelas distâncias, sem depender dos eixos; 7 componentes ficam perto da dimensão de correlação do min-max.
+- Distâncias (3.5): quanto menos componentes, menos concentradas: variância relativa 0,355 no min-max, 0,391 com 7, 0,407 com 6, 0,436 com 4 e 0,475 com 3.
+- Dimensão intrínseca global (3.5-b): no min-max, D2 = 6,17, ρ-score = 3,95 e MLE = 11,94; os três medem em escalas diferentes. No PCA principal, D2 = 4,89 e MLE = 7,23.
+- **Dimensão local por gênero (3.5-c), pedida pelo professor e estudada a fundo a pedido do aluno:** o público de cada gênero (os 10% de usuários com maior proporção nele), em 5 amostras de 2.000 pareadas por atividade, com usuários sorteados e um placebo (os 10% de maior nota média) como referência. Todos os 18 públicos precisam de 7 componentes, como os sorteados (Western, de 6 a 7). D2 vai de 5,97 (Western) a 6,57 (Mystery), contra 6,20 nos sorteados, e o placebo muda D2 em −0,36: as diferenças entre gêneros têm o tamanho do efeito de qualquer seleção. Pela regra fixada antes, nenhum gênero precisa de outro d′. O que muda é a forma: o 1º componente guarda de 27,0% (Mystery) a 37,5% (Adventure) da variância do público. O estudo completo, com mais amostras e sem pareamento, está em `analises/dimensao_por_genero.py`; a versão "depois do agrupamento" entra na validação de P1.
+
+**Como chegou aqui.**
+1. *v5 a v9:* PCA do z-score; d′ = 6 pelo Kaiser-Guttman (autovalor ≥ 1, 66,84%); broken-stick 2 e 80% com 9 componentes (alternativa medida da 3.5 à 3.9 na v9, a pedido do aluno).
+2. *26/11/2026:* o professor apontou que o PCA e o broken-stick não estavam do jeito certo (o resultado no fim do gráfico era estranho) e pediu os critérios acima, testados juntos, e o gráfico de distâncias sem a curva do z-score, com o PCA de cada critério.
+3. *"Até mais 1":* lido primeiro como ⌈D⌉ + 1; o aluno esclareceu que é um quarto critério. A dimensão intrínseca passou a dar d′ = ⌈D⌉, e o critério gráfico entrou como o quarto.
+4. *v10 (26/11/2026):* implementada.
 
 **Alternativas.**
-- *Broken-stick (2 componentes):* muito abaixo da dimensionalidade intrínseca.
-- *80% da variância (9 componentes):* mais perto da dimensionalidade intrínseca; fica como alternativa em P1. A pedido do aluno, desde a v9 (25/11/2026) ele é medido ao lado do PCA principal da 3.5 à 3.9, nos dois vetores:
+- *Broken-stick (3):* o mais compacto e o que menos concentra as distâncias, mas descarta 35% da variância; fica como alternativa.
+- *Kaiser-Guttman e ρ-score (4) e 80% (6):* entre os dois; aparecem nas comparações de 3.5 e 3.5-b.
+- *MLE (12):* mede a estrutura fina dos vizinhos, onde o ruído acrescenta dimensões.
 
-  | | base, 6 | base, 9 | revisado, 7 | revisado, 9 |
-  |---|---:|---:|---:|---:|
-  | variância retida | 66,84% | 80,07% | 73,94% | 82,37% |
-  | variância relativa das distâncias | 0,426 | 0,417 | 0,369 | 0,354 |
-  | contraste relativo | 110,66 | 92,57 | 45,18 | 44,28 |
-  | dimensionalidade intrínseca | 6,4 | 8,4 | 7,2 | 8,5 |
-  | Hopkins (1–99) | 0,705 | 0,718 | 0,684 | 0,685 |
-  | atípicos | 1.293 | 1.422 | 1.171 | 1.351 |
-  | pivôs: distâncias evitadas (16 pivôs) | 99,9% | 99,2% | 99,8% | 99,0% |
+**Limitações.** D2 depende da faixa de raios do ajuste: 6,9 com raios menores e 5,5 com maiores (⌈D2⌉ entre 6 e 7); a semente muda no máximo 0,08. O ρ-score fica na fronteira entre 4 e 5 conforme a amostra (3,87 a 4,14). O PCA com 7 componentes perde parte da estrutura fina (MLE de 11,9 para 7,2).
 
-  Com 9 componentes, guarda-se mais informação e a tendência de agrupamento sobe um pouco no vetor base; em troca, as distâncias ficam um pouco menos nítidas, aparecem mais atípicos e as buscas de vizinhos ficam mais lentas. As diferenças são pequenas, e a escolha fica para P1, pela qualidade dos grupos.
-- *Os 21 atributos sem PCA:* continuam como entrada candidata (`X_p1_padronizado`).
+**Onde está a evidência.** 3.4 (tabela de autovalores, scree plot com os critérios, log C(r) × log r, sensibilidade), 3.5, 3.5-b, 3.5-c; `analises/pca_criterios.py` e `analises/dimensao_por_genero.py`.
 
-**Limitações.** O PCA com 6 componentes guarda 66,84% da variância e descarta parte da estrutura.
-
-**Onde está a evidência.** 3.4, 3.5, 3.5-b, 3.6, 3.10.
-
-**Status.** Implementada desde a v5. Até a v6, com `prop_unknown`, eram 7 componentes e 68,41%. Como entrada principal de P1, foi substituída pelo PCA do vetor revisado (decisão 23); o PCA do vetor base fica como comparação.
+**Status.** Implementada desde a v5 com o z-score e 6 componentes; na v10, min-max, quatro critérios e 7 componentes.
 
 <a id="d21"></a>
 
@@ -670,29 +687,29 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 *Notebook: 3.7-a, 3.8-b.*
 
 **O que foi decidido.** Um usuário é marcado como atípico quando está, ao mesmo tempo, longe do centro e isolado dos vizinhos:
-- *longe do centro:* a distância de Mahalanobis ao centro (uma distância que leva em conta a correlação entre os atributos), no espaço PCA, passa do quantil 0,999 da χ² com 6 graus de liberdade;
+- *longe do centro:* a distância de Mahalanobis ao centro (uma distância que leva em conta a variância de cada eixo), no PCA principal, passa do quantil 0,999 da χ² com 7 graus de liberdade (24,32);
 - *isolado:* a distância ao 10º vizinho mais próximo passa do percentil 99.
 
 Nenhum usuário é removido: a marca `atipico` permite executar P1 com e sem esses usuários.
 
 **Por quê.**
 - O k-means e outros métodos baseados em médias são sensíveis a objetos muito afastados, que deslocam os centróides. Por isso é preciso identificá-los.
-- Atípicos podem ser objetos legítimos: aqui, usuários com gosto concentrado em poucos gêneros. Em quase todos, o atributo mais extremo é um gênero raro: Documentary (222 usuários), Film-Noir (215), Western (183) e War (118). Eles avaliam menos filmes (mediana de 35 contra 71) e dão notas um pouco mais altas (mediana da média 3,88 contra 3,70).
-- Exigir os dois critérios evita marcar nichos: 2.270 usuários estão longe do centro, mas têm vizinhos próximos.
-- Resultado: 1.293 usuários (0,80%) marcados.
+- Atípicos podem ser objetos legítimos: usuários com gosto concentrado ou uma forma própria de dar notas. Na v10, o atributo mais extremo é, em geral, um gênero de frequência média ou a nota: Horror (214 usuários), Animation (150), desvio-padrão da nota (145), Sci-Fi (125) e nota média (85). Eles avaliam menos filmes (mediana de 30 contra 71) e dão notas um pouco mais altas (mediana da média 3,78 contra 3,70).
+- Exigir os dois critérios evita marcar nichos: 2.743 usuários estão longe do centro, mas têm vizinhos próximos.
+- Resultado: 1.156 usuários (0,71%) marcados.
 
 **Alternativas descartadas.**
-- *|z| > 3 em algum atributo (critério univariado):* marca 31.263 usuários (19,23%). Com caudas tão longas, marca a cauda de cada atributo, não casos isolados.
-- *Só Mahalanobis:* marca 3.563 usuários (2,19%), cerca de 22 vezes os 163 esperados sob normalidade, incluindo possíveis grupos de nicho.
+- *|z| > 3 em algum atributo (critério univariado):* marca 28.962 usuários (17,82%). Com caudas tão longas, marca a cauda de cada atributo, não casos isolados.
+- *Só Mahalanobis:* marca 3.899 usuários (2,40%), cerca de 24 vezes os 163 esperados sob normalidade, incluindo possíveis grupos de nicho.
 - *Remover os atípicos:* perderia usuários legítimos; a marca permite comparar.
 
 **Limitações.**
 - Os limiares (quantil 0,999 e percentil 99) são escolhas registradas, e a referência χ² supõe normalidade, que os dados não seguem.
-- No vetor revisado, os atípicos são outros: 1.171, dos quais só 412 também são atípicos no vetor base (Jaccard 0,20).
+- No vetor revisado, os atípicos são outros: 1.348, dos quais só 377 também são atípicos no vetor base (Jaccard 0,18).
 
 **Onde está a evidência.** 3.7-a, 3.8-b, 3.10.
 
-**Status.** Implementada desde a v5. Na v6, com `Unknown`, eram 1.365 atípicos; sem ele, os valores extremos vêm dos gêneros raros de verdade, que o vetor revisado agrupa.
+**Status.** Implementada desde a v5. Até a v9, no PCA do z-score, os atípicos vinham dos gêneros raros (Documentary, Film-Noir, Western e War), que o z-score ampliava; eram 1.293 na v9 e 1.365 na v6, com `Unknown`.
 
 <a id="d22"></a>
 
@@ -703,111 +720,103 @@ Nenhum usuário é removido: a marca `atipico` permite executar P1 com e sem ess
 **O que foi decidido.** Vale agrupar, mas deve-se esperar separação fraca entre os grupos. A validação de P1 precisa comparar seus índices com os de partições de dados uniformes no mesmo domínio.
 
 **Por quê.**
-- A estatística de Hopkins compara distâncias de pontos uniformes e de usuários reais: H ≈ 0,5 indica dados indistinguíveis de pontos uniformes; H perto de 1 indica dados concentrados em regiões. O controle com dados uniformes dá H = 0,500 nos dois espaços, o que confirma o cálculo.
-- No domínio robusto (percentis 1 a 99), H = 0,705 no PCA e 0,767 no z-score; sem os atípicos, 0,696 e 0,762. O desvio-padrão entre as 10 repetições é no máximo 0,0040. Os usuários são mais concentrados que pontos uniformes, e isso não é efeito dos atípicos.
-- A tendência é moderada: uma referência usual é H > 0,75 para tendência clara, e o espaço PCA fica abaixo dela. As projeções 2D mostram um núcleo denso com caudas, não grupos separados.
+- A estatística de Hopkins compara distâncias de pontos uniformes e de usuários reais: H ≈ 0,5 indica dados indistinguíveis de pontos uniformes; H perto de 1 indica dados concentrados em regiões. O controle com dados uniformes dá H = 0,500 nos três espaços, o que confirma o cálculo.
+- No domínio robusto (percentis 1 a 99), H = 0,678 no PCA principal, 0,752 no min-max e 0,654 no PCA do broken-stick; sem os atípicos, 0,674, 0,748 e 0,654. O desvio-padrão entre as 10 repetições é no máximo 0,012. Os usuários são mais concentrados que pontos uniformes, e isso não é efeito dos atípicos.
+- A tendência é moderada: uma referência usual é H > 0,75 para tendência clara; o min-max fica no limite, e os espaços PCA ficam abaixo. As projeções 2D mostram uma nuvem contínua, sem grupos separados.
 
-**Alternativas descartadas.** *Domínio mín–máx:* dá H = 0,960 (PCA) e 0,953 (z-score), inflado pelos extremos, que alargam o domínio dos pontos uniformes. Sem os atípicos, cai para 0,930 e 0,932.
+**Alternativas descartadas.** *Domínio mín–máx:* dá H de 0,895 a 0,946, inflado pelos extremos, que alargam o domínio dos pontos uniformes.
 
 **Limitações.** H mede concentração, não separação: um único aglomerado denso também dá H alto. A separação entre grupos só pode ser avaliada em P1.
 
 **Onde está a evidência.** 3.6, 3.7-b.
 
-**Status.** Implementada desde a v5.
+**Status.** Implementada desde a v5. Na v9, no PCA do z-score, H era 0,705.
 
 <a id="d23"></a>
 
 ### 23. Vetor revisado e seu PCA como entrada principal de P1
 
-*Notebook: 3.8, 3.8-b, 3.10.*
+*Registro: D7 (item 4). Notebook: 3.8, 3.8-b, 3.10.*
 
-**O que foi decidido.** A entrada principal de P1 é `X_rev_pca`: o PCA do vetor revisado, com 7 componentes (Kaiser-Guttman, 73,94% da variância). O vetor revisado:
-- usa os **grupos do perfil** da decisão 24: o IMAX sai, e Animation e Children formam um grupo só, `Animation/Children`; ficam 17 grupos;
+**O que foi decidido.** A entrada principal registrada de P1 é `X_rev_pca`: o PCA do vetor revisado, com 9 componentes (dimensão intrínseca D2 = 8,25; 67,32% da variância). O vetor revisado:
+- usa os **grupos do perfil** da decisão 24 (Animation e Children num grupo só; 17 grupos);
 - usa a **proporção fracionária**: cada avaliação distribui peso 1/k entre os k grupos do filme, e o vetor de gêneros soma 1;
 - junta no grupo `raros` os grupos com menos de 2% das avaliações na contagem fracionária (War, Musical, Documentary, Western e Film-Noir, que somam 5,27%); os rótulos continuam nos dados;
-- acrescenta atributos derivados: viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes vistos, e diversidade de gêneros (entropia normalizada, agora por log(17));
+- acrescenta atributos derivados: viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes vistos, e diversidade de gêneros (entropia normalizada por log(17));
+- desde a v10, tem o **desvio-padrão da nota em cada grupo, na forma relativa**: `dprel_<grupo>` = n / (n + 5) · (desvio no grupo − desvio geral), 0 com menos de 2 avaliações no grupo, nos 12 grupos mantidos e em `raros`;
+- passa pela mesma seleção de 3.2 (sai `nota_media`) e fica com 32 atributos;
 - tem um gênero dominante, usado só para descrever.
 
-O vetor base e as matrizes z-score ficam como comparação. Até a v6, o vetor revisado também tirava `Unknown`; desde a v7, `Unknown` já não existe (decisão 14).
-
 **Por quê.**
-- O vetor base tem três problemas: proporções que somam mais que 1 (contagem dupla de gêneros); gêneros raros que geram os valores extremos e a maior parte dos atípicos; e a atividade fora da distância.
+- O vetor base tem três problemas: proporções que somam mais que 1 (contagem dupla de gêneros); gêneros raros que geram valores extremos; e a atividade fora da distância.
 - A popularidade dos filmes vistos é o filtro com maior efeito sobre a nota (d de Cohen 0,73 entre filmes populares e de nicho, 1.7-c).
-- Os gêneros com pouca participação nas avaliações são informação real do catálogo, por isso continuam nos dados; no vetor, são agrupados para não distorcer as distâncias (1.6-c).
-- O vetor revisado guarda mais variância (73,94% em 7 componentes, contra 66,84% em 6 no vetor base) e gera 9% menos atípicos (1.171 contra 1.293), ao custo de um componente a mais. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos. A estatística de Hopkins fica próxima (0,68 contra 0,70 no PCA).
-- Os eixos são interpretáveis:
-  - CP1 (20,9%): ação, aventura e ficção contra romance;
-  - CP2 (14,7%): crime e suspense contra animação/infantil e fantasia;
-  - CP3 (11,7%): nota média e viés do usuário;
-  - CP4 (8,4%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
-  - CP5 (7,6%): gêneros raros, em usuários que veem filmes mais antigos;
-  - CP6 (5,7%): ano médio dos filmes vistos;
-  - CP7 (5,0%): atividade e comédia contra mistério e horror.
-- Redundância: o par mais associado (nota média × viés, Pearson 0,903, Spearman 0,881) só passa em um dos dois critérios; nenhum atributo sai, e o vetor tem 20 atributos.
+- *Desvio relativo:* atende ao pedido do professor de um desvio por gênero de forma definida para todos os usuários. A forma relativa diz quanto o usuário varia mais ou menos as notas naquele grupo do que no geral, e não repete `nota_dp` (as formas bruta e encolhida para o desvio geral ficam acima de 0,8 de correlação com ele). O fator n / (n + 5) puxa para 0 quem tem poucas avaliações no grupo. Os 13 grupos têm mais avaliações por usuário que os gêneros isolados: o desvio existe para 71,2% (Horror) a 99,9% (Drama) dos usuários. A conferência num caso (usuário 1, Drama: 53/58 × (1,0477 − 1,0042) = 0,0397) é feita pelo código.
+- Os eixos são interpretáveis: CP1 (18,4%) aventura, ação e ficção contra drama; CP2 (11,4%) atividade contra popularidade; CP3 (10,5%) suspense e crime contra comédia; CP4 (7,8%) desvio geral da nota contra viés; CP5 (5,1%) comédia e suspense contra drama; CP6 e CP7 (3,9% e 3,8%) os desvios relativos; CP8 e CP9 (3,5% e 3,0%) o ano médio dos filmes vistos.
 
-**Antes e depois dos grupos do perfil (só para transparência).** Sem os grupos (v7), o PCA revisado tinha 6 componentes (69,13% da variância), 1.078 atípicos e Hopkins de 0,68. Com IMAX fora e Animation/Children juntos (v8), passa a 7 componentes (73,94%), 1.171 atípicos e o mesmo Hopkins. A decisão dos grupos é de taxonomia e não depende desta comparação (decisão 24).
+**O custo medido dos desvios relativos (transparência, 3.8-b).**
 
-**Alternativas.** *Vetor base (21 atributos ou PCA com 6 componentes):* fica como comparação, inclusive para medir o efeito da concentração de distâncias um pouco maior do vetor revisado.
+| | base, PCA 7 | revisado sem desvios, PCA 7 | revisado, PCA 9 |
+|---|---:|---:|---:|
+| atributos | 19 | 19 | 32 |
+| variância retida | 85,73% | 80,34% | 67,32% |
+| variância relativa das distâncias | 0,391 | 0,344 | 0,310 |
+| Hopkins (1–99) | 0,678 | 0,681 | 0,656 |
+| atípicos | 1.156 | 1.070 | 1.348 |
 
-**Limitações.**
-- As distâncias ficam um pouco mais concentradas no vetor revisado: no PCA, o contraste relativo cai de 110,66 para 45,18, e a variância relativa, de 0,426 para 0,369.
-- A dimensionalidade intrínseca é de 7,2 no PCA revisado, contra 6,4 no PCA base (no espaço z, 12,0 contra 13,2).
-- No vetor revisado, os atípicos se concentram em horror (327 usuários).
-- O limite de 2% e os grupos são escolhas registradas; a sensibilidade do limite está na decisão 13.
+Os 13 desvios relativos são colunas fracas e quase independentes: o vetor precisa de mais componentes para guardar menos variância, as distâncias ficam mais concentradas, e o fim do scree plot volta a cruzar a curva broken-stick (autovalores 24 a 31; a regra do último acima daria 31 componentes, e a regra usa os 4 iniciais). O último autovalor é zero porque as 13 proporções fracionárias somam 1.
 
-**Onde está a evidência.** 3.8-a, 3.8-b, 3.10; 1.6-c e 1.7-c para a origem dos atributos; `execucoes/real_v8.ipynb`.
+**Alternativas.**
+- *Vetor base (PCA com 7 componentes):* guarda mais variância e concentra menos as distâncias; fica como comparação.
+- *Vetor revisado sem os desvios relativos (7 componentes, 80,34%):* medido na 3.8-b; fica como comparação.
 
-**Status.** Implementada desde a v5. Desde a v6, o ano médio usa também o ano preenchido pelo IMDb. Desde a v8 (25/11/2026), o vetor usa os grupos do perfil.
+**Limitações.** Com os desvios relativos, o vetor revisado perde nos números de 3.8-b para o vetor base e para a versão sem desvios. A entrada principal fica a registrada, pelos ganhos de representação, mas P1 compara as três e decide pela qualidade dos grupos. O limite de 2% e os grupos são escolhas registradas; a sensibilidade do limite está na decisão 13.
+
+**Onde está a evidência.** 3.8-a, 3.8-b, 3.10; 1.6-c e 1.7-c para a origem dos atributos; `execucoes/real_v10.ipynb`.
+
+**Status.** Implementada desde a v5. Desde a v6, o ano médio usa também o ano preenchido pelo IMDb; desde a v8, os grupos do perfil. Na v10 (26/11/2026), PCA em min-max, d′ pela dimensão intrínseca (na v9: 7 componentes pelo Kaiser-Guttman do z-score, 73,94%), desvios relativos e limiar de 0,8.
 
 <a id="d24"></a>
 
 ### 24. Grupos do perfil: IMAX fora, Animation e Children juntos
 
-*Registro: D5 (e o fechamento da D4). Notebook: 3.8-a, 3.8-b, 3.10.*
+*Registro: D5, D7 (item 3) e o fechamento da D4. Notebook: 2.2, 2.2-b, 3.8-a, 3.8-b, 3.10.*
 
-**O que foi decidido.** Só no vetor revisado (3.8):
-- o IMAX sai, porque é formato de exibição, e não gênero;
-- Animation e Children formam um grupo só, `Animation/Children`;
-- k passa a ser o número de grupos distintos do filme, e o limite de 2% vale para os 17 grupos que sobram (os 19 gêneros, sem IMAX e com Animation e Children juntos).
-
-Os rótulos dos dados não mudam, e o vetor base (seções 3.1 a 3.7) continua com os 19 gêneros.
+**O que foi decidido.**
+- *IMAX:* desde a v10, sai da lista de gêneros na limpeza (2.2), antes de qualquer tratamento, e vale para os dois vetores. O único filme que só tinha IMAX fica sem gênero e recebe o gênero do IMDb (2.2-b).
+- *Animation e Children:* só no vetor revisado (3.8), formam um grupo só, `Animation/Children`; k passa a ser o número de grupos distintos do filme, e o limite de 2% vale para os 17 grupos (os 18 gêneros, com Animation e Children juntos). Os rótulos dos dados não mudam.
 
 **Como chegou aqui.**
 1. *Proposta da D5 (registrada desde a v5):* IMAX fora do vetor do perfil; Animation e Children num grupo só.
 2. *25/11/2026:* o aluno aprovou ("faz sentido isso do perfil ter o Animation e Children"; sobre IMAX fora: "as duas"). A proposta foi à mesa de 7 só para o vetor revisado: 2 aprovam (professor de Banco de Dados e cientista de dados) e 5 aprovam com ajuste.
-3. *Ajustes da mesa:* números esperados registrados antes da execução; a decisão declarada como de taxonomia; sobreposição nos dois sentidos; tabela de sensibilidade do limite; uma constante única de agrupamento (`GRUPO_DO_GENERO`), com `assert` de 17 grupos e de soma 1; os quatro casos de borda testados ("Action|IMAX", só IMAX, "Animation|Children|Comedy", só "Animation"); exemplo calculado; fechar as pendências da D4.
-4. *v8 (25/11/2026):* implementada na célula 3.8-a. Os números esperados bateram (17 grupos; Animation/Children com 3,34%, esperado perto de 3,33%; 12 grupos mantidos; `raros` com 5,27%; 1 filme só com IMAX; com 1,5% só War muda e com 2,5% só Mystery). Novo número de controle: grupos do perfil.
+3. *Ajustes da mesa:* números esperados registrados antes da execução; a decisão declarada como de taxonomia; sobreposição nos dois sentidos; tabela de sensibilidade do limite; uma constante única de agrupamento (`GRUPO_DO_GENERO`), com `assert` de 17 grupos e de soma 1; casos de borda testados; exemplo calculado; fechar as pendências da D4.
+4. *v8 (25/11/2026):* implementada na célula 3.8-a, com os números esperados conferidos.
+5. *26/11/2026 (D7):* o professor indicou tirar o IMAX já no pré-processamento, por ser só um tipo de sala e de tela. A mesa pediu que a retirada viesse antes da 2.2-b, para o filme só com IMAX passar pela regra dos filmes sem gênero. Números esperados: 4.823 filmes com gênero do IMDb, 240 excluídos e 24.998.518 avaliações; todos conferiram na v10 (o filme 4460, Encounter in the Third Dimension, recebeu Adventure, Comedy e Drama).
 
 **Por quê.**
 - *IMAX é formato, não gênero:* dos 195 filmes IMAX, só 1 não tem outro gênero. Nas avaliações, 63% dos IMAX também são Action, 60% Adventure e 45% Sci-Fi.
-- *Animation e Children têm o mesmo público em grande parte:* 77,6% das avaliações de Animation são de filmes também Children; no sentido contrário, 59,6%. O Jaccard nos filmes é 0,213, e a correlação entre usuários, 0,82 (3.2).
-- *O grupo fica acima do limite:* Animation/Children tem 3,34% das avaliações. Na v7, Animation (1,66%) caía em `raros`, junto com Film-Noir e Documentary, e Children (2,38%) ficava sozinho. O grupo tem menos que a soma dos dois (4,03%): contado uma vez só por filme, ele passa a outros gêneros o peso que antes ia duas vezes para o mesmo público (cerca de 0,70 ponto, pela conta da mesa).
+- *Animation e Children têm o mesmo público em grande parte:* 77,6% das avaliações de Animation são de filmes também Children; no sentido contrário, 59,6%. O Jaccard nos filmes é 0,213, e a correlação entre usuários, 0,823 (Pearson) e 0,804 (Spearman).
+- *O grupo fica acima do limite:* Animation/Children tem 3,34% das avaliações. Na v7, Animation (1,66%) caía em `raros`, e Children (2,38%) ficava sozinho.
 
-**A natureza da decisão: taxonomia, não redundância.** A correlação entre Animation e Children (0,82) fica abaixo do limiar de redundância da 3.2 (0,9), e por isso os dois ficaram no vetor base. Os dois também não são equivalentes (77,6% num sentido, 59,6% no outro). Juntá-los é uma escolha de taxonomia (de como classificar): o grupo descreve o público de animação e infantil. Por isso a decisão vale qualquer que seja o resultado da 3.8-b; a comparação entre v7 e v8 aparece só para transparência (decisão 23).
+**A natureza da decisão: taxonomia.** Desde a v10, com o limiar de 0,8, Animation × Children passa como redundante na 3.2, e `prop_children` sai do vetor base. No vetor revisado, em vez de descartar um dos dois, a junção guarda os dois públicos num grupo só. Os dois não são equivalentes (77,6% num sentido, 59,6% no outro): juntá-los é uma escolha de como classificar, e o grupo descreve o público de animação e infantil.
 
 **Exemplo calculado** (peso de cada avaliação do filme, conferido contra o cálculo do Spark):
-- *Toy Story (1995)*, Adventure|Animation|Children|Comedy|Fantasy: na v7, 1/5 para cada um dos 5 gêneros; na v8, 1/4 para cada um dos 4 grupos (Adventure, Animation/Children, Comedy, Fantasy).
-- *Avatar (2009)*, Action|Adventure|Sci-Fi|IMAX: na v7, 1/4 para cada gênero; na v8, 1/3 para Action, Adventure e Sci-Fi. A fração do IMAX vai para os outros gêneros do filme.
-- Só 1 filme tem apenas IMAX (Encounter in the Third Dimension, 27 avaliações); essas avaliações ficam fora das proporções de gênero.
+- *Toy Story (1995)*, Adventure|Animation|Children|Comedy|Fantasy: por gênero, 1/5 para cada um dos 5 gêneros; por grupo, 1/4 para cada um dos 4 grupos (Adventure, Animation/Children, Comedy, Fantasy).
+- *Avatar (2009)*, Action|Adventure|Sci-Fi|IMAX: com o IMAX fora, 1/3 para Action, Adventure e Sci-Fi; a fração que o IMAX levava vai para os outros gêneros do filme.
 
-**Sensibilidade do limite.** Com o limite em 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`). Nenhum outro grupo muda entre 1,5% e 2,5%, e o limite fica em 2%.
+**Sensibilidade do limite.** Com o limite em 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`).
 
-**Efeito no vetor revisado.**
-- 17 grupos; 12 acima do limite: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3%, Romance 6,8%, Crime 5,8%, Sci-Fi 5,7%, Fantasy 3,5%, Animation/Children 3,3%, Horror 3,2% e Mystery 2,5%.
-- `raros` passa a ter War, Musical, Documentary, Western e Film-Noir (5,27%); na v7, tinha também Animation e IMAX.
-- O vetor continua com 20 atributos: a coluna `frac_animation_children` entra no lugar de `frac_children` (na v7, Animation estava dentro de `raros`), e a diversidade de gêneros passa a ser normalizada por log(17).
-- O PCA revisado passa de 6 componentes (69,13%) para 7 (73,94%), e os atípicos, de 1.078 para 1.171; o Hopkins fica em 0,68 (decisão 23).
+**Efeito no vetor revisado.** 17 grupos; 12 acima do limite: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3%, Romance 6,8%, Crime 5,8%, Sci-Fi 5,7%, Fantasy 3,5%, Animation/Children 3,3%, Horror 3,2% e Mystery 2,5%. `raros` tem War, Musical, Documentary, Western e Film-Noir (5,27%).
 
 **Alternativas descartadas.**
-- *Juntar também no vetor base:* o vetor base fica como representação fiel dos 19 gêneros e como comparação.
+- *Juntar Animation e Children também no vetor base:* o vetor base fica como representação dos gêneros do catálogo, com a seleção de 3.2.
 - *Renomear Children para Family:* Family é o rótulo do IMDb e concorda só em parte com Children (62,5% e 53,2%, decisão 11).
-- *Manter como na v7 (Animation em `raros`, Children sozinho, IMAX no vetor):* separava um público que é em grande parte o mesmo e mantinha no perfil um formato de exibição.
+- *Tirar o IMAX só do vetor revisado (v8 e v9):* deixava no vetor base e no preenchimento um rótulo que não é gênero.
 
 **Limitações.** O limite de 2% e os grupos são escolhas registradas. A animação adulta (anime, por exemplo) entra no grupo de animação e infantil, porque só 21% dos filmes têm os dois gêneros; os rótulos dos dados continuam separados.
 
-**Onde está a evidência.** 3.8-a (grupos, sobreposição, exemplo e tabela de sensibilidade), 3.8-b, 3.10; `execucoes/real_v8.ipynb`; `docs/decisoes.md` (D5 e D4).
+**Onde está a evidência.** 2.2, 2.2-b, 3.8-a, 3.8-b, 3.10; `docs/decisoes.md` (D5, D4 e D7).
 
-**Status.** Implementada na v8 (25/11/2026). Fecha também os pedidos pendentes da D4 (decisão 13). Com isso, o registro de decisões não tem mais pendências da seção 3; as próximas etapas são P1 e P2.
+**Status.** Implementada na v8 (25/11/2026); IMAX fora no pré-processamento desde a v10 (26/11/2026).
 
 <a id="d25"></a>
 

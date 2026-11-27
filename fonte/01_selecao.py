@@ -1231,6 +1231,7 @@ plt.show()
 # |---|---|
 # | A nota ocupa os 10 valores válidos e é assimétrica à esquerda; 0,5 e 1,0 ficam abaixo do whisker | conferir domínio e nulos; manter notas baixas como outliers legítimos |
 # | 5.062 filmes com `(no genres listed)`, parte deles com avaliações (1.6-c) | rótulo `Unknown`; preencher o gênero pelo IMDb (2.2-b) e validar com o público do filme (kNN, 2.2-c) |
+# | IMAX (195 filmes) acompanha quase sempre outro gênero e tem muitas avaliações por filme (1.6-c): é o formato da sala e da tela de exibição, e não gênero | retirar o IMAX da lista de gêneros antes do preenchimento (2.2) |
 # | `imdbId`/`tmdbId` são identificadores externos | não entram como atributos de P1/P2; o `imdbId` serve de chave para buscar no IMDb o gênero e o ano que faltam (2.2-b); ausências de `tmdbId` não exigem tratamento |
 # | Filmes sem ano no fim do título (1.8-c) | ano preenchido pelo IMDb (2.2-b) para o perfil revisado; a análise por década da Seção 1 continua só com o ano do título |
 # | Filmes do catálogo sem avaliação | ficam fora de P1/P2, pois não têm comportamento de avaliação |

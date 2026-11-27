@@ -72,6 +72,7 @@ print("Avaliações sem filme correspondente:", avaliacoes_orfas)
 # | `ratings`: 0 nulos, 0 duplicatas e 0 notas inválidas | qualidade verificada | nenhuma avaliação removida por qualidade; a regra de deduplicação (mais recente pelo `timestamp`) fica no código para reprodutibilidade |
 # | títulos repetidos com o mesmo código TMDb | redundância: o mesmo filme cadastrado duas vezes | fundir as cópias pela regra automática (2.2-a) |
 # | 5.062 filmes `(no genres listed)` | valor ausente em atributo usado no perfil | rótulo `Unknown`; gênero preenchido pelo IMDb, ligado pela tabela `links` (2.2-b); os que o IMDb não resolve não têm tratamento automático e são excluídos, se a exclusão não pesar (2.2-d) |
+# | IMAX em 195 filmes | rótulo que não é gênero: IMAX é o formato da sala e da tela de exibição | retirado da lista de gêneros antes de qualquer outro tratamento (2.2); o único filme que só tinha IMAX fica sem gênero e segue a regra dos filmes sem gênero (2.2-b) |
 # | 412 filmes sem ano no título | valor ausente em atributo usado no perfil revisado (3.8) | ano preenchido pelo IMDb (2.2-b) |
 # | 107 links sem `tmdbId` | valor ausente em atributo pouco usado | ignorar: o `imdbId` é a chave para o IMDb (2.2-b), e o `tmdbId` só entra na regra dos títulos repetidos (2.2-a), em que um filme sem ele fica fora da fusão |
 # | Tags | fora dos dados-alvo | não tratadas nesta fase |
@@ -106,20 +107,28 @@ ratings_clean = ratings_clean.withColumn(
 ).cache()
 ratings_clean.count()  # materializa o cache para as estatísticas seguintes
 
+# IMAX é o formato da sala e da tela de exibição, e não gênero: sai da lista de gêneros antes de qualquer tratamento.
+# Um filme que só tinha IMAX fica sem gênero e segue a regra dos filmes sem gênero (2.2-b).
+filmes_com_imax = movies_df.filter(F.array_contains(F.split("genres", r"\|"), "IMAX"))
+n_filmes_imax = filmes_com_imax.count()
+ids_so_imax = [int(r["movieId"]) for r in filmes_com_imax.filter(F.col("genres") == "IMAX").select("movieId").collect()]
+n_so_imax = len(ids_so_imax)
 movies_clean = (
     movies_df
     .filter(F.col("movieId").isNotNull() & F.col("title").isNotNull())
     .dropDuplicates(["movieId"])
+    .withColumn("genres", F.array_join(F.array_remove(F.split(F.coalesce("genres", F.lit("")), r"\|"), "IMAX"), "|"))
     .withColumn(
         "genres",
         F.when(
-            F.col("genres").isNull()
-            | (F.trim(F.col("genres")) == "")
+            (F.trim(F.col("genres")) == "")
             | (F.col("genres") == "(no genres listed)"),
             F.lit("Unknown"),
         ).otherwise(F.col("genres")),
     )
 )
+assert movies_clean.filter(F.array_contains(F.split("genres", r"\|"), "IMAX")).limit(1).count() == 0
+print(f"IMAX retirado da lista de gêneros: {n_filmes_imax:,} filmes; só com IMAX (ficam sem gênero): {n_so_imax}")
 
 links_clean = (
     links_df
@@ -217,7 +226,7 @@ print(f"\nCópias fundidas: {len(mapa_fusao)}; avaliações repetidas removidas:
 # %% [markdown]
 # #### Gênero e ano que faltam: integração com o IMDb
 #
-# O gênero entra no perfil do usuário, e o ano entra no perfil revisado (3.8). No MovieLens, 5.062 filmes não têm gênero e 412 não têm ano no título. Os dois valores existem na realidade, só não foram registrados.
+# O gênero entra no perfil do usuário, e o ano entra no perfil revisado (3.8). No MovieLens, 5.062 filmes não têm gênero (mais 1 que só tinha IMAX e ficou sem gênero na 2.2) e 412 não têm ano no título. Os dois valores existem na realidade, só não foram registrados.
 #
 # A tabela `links` do próprio MovieLens traz o código IMDb de cada filme. O arquivo público do IMDb (`title.basics`) tem gênero e ano de lançamento por código. A integração das duas fontes pela chave é feita assim:
 #
@@ -283,7 +292,7 @@ def converter_imdb(texto):
     return [] if pd.isna(texto) else sorted({CONVERSAO_IMDB[g] for g in texto.split(",") if g in CONVERSAO_IMDB})
 
 filmes_pd["generos_imdb"] = filmes_pd["genres_imdb"].map(converter_imdb)
-filmes_pd["generos_ml"] = filmes_pd["genres"].map(lambda s: [] if s == "Unknown" else [g for g in s.split("|") if g != "IMAX"])
+filmes_pd["generos_ml"] = filmes_pd["genres"].map(lambda s: [] if s == "Unknown" else s.split("|"))
 ambos = filmes_pd[(filmes_pd["generos_ml"].str.len() > 0) & (filmes_pd["generos_imdb"].str.len() > 0)]
 linhas_conv = []
 for imdb_g, ml_g in CONVERSAO_IMDB.items():
@@ -333,6 +342,9 @@ print(f"\nOrigem do gênero (denominadores: {len(filmes_pd):,} filmes e {int(fil
 print(resumo_origem("origem_genero").round(3).to_string())
 print(f"Filmes com gênero do IMDb: {preenche_genero.sum():,}; continuam sem gênero: {(sem_genero & ~preenche_genero).sum():,} "
       f"(com 5 ou mais avaliações: {(sem_genero & ~preenche_genero & (filmes_pd['avaliacoes'] >= 5)).sum():,})")
+so_imax_pd = filmes_pd[filmes_pd["movieId"].isin(ids_so_imax)]
+print(f"Filmes que só tinham IMAX (2.2) com gênero do IMDb: {int(preenche_genero[so_imax_pd.index].sum())} de {len(so_imax_pd)}",
+      so_imax_pd[["movieId", "title", "genero_final"]].to_dict("records"))
 print("\nOrigem do ano:")
 print(resumo_origem("origem_ano").round(3).to_string())
 print("\nTipo do título no IMDb dos filmes sem gênero no MovieLens:",
@@ -399,16 +411,16 @@ plt.show()
 #   - Concordância baixa: Musical (48% e 43%), Mystery (67% e 48%) e Film-Noir (73% e 45%). As duas fontes não usam esses rótulos do mesmo jeito.
 #   - `Music` não vira Musical: só 15,4% desses filmes são Musical no MovieLens.
 # - **Ano:** nos 61.879 filmes com ano nas duas fontes, o ano é igual em 92,8% e difere em até 1 ano em 99,0%. Os 644 com diferença maior ficam como indicador da qualidade da chave; nada é corrigido.
-# - **Gênero preenchido:** 4.822 dos 5.062 filmes sem gênero recebem o gênero do IMDb (25.221 avaliações, 0,10% do total). Continuam sem gênero 240 filmes (1.406 avaliações, 0,006%), dos quais só 55 têm 5 ou mais avaliações; eles são excluídos em 2.2-d.
+# - **Gênero preenchido:** 4.823 dos 5.063 filmes sem gênero (os 5.062 sem gênero no MovieLens e o único que só tinha IMAX) recebem o gênero do IMDb (25.248 avaliações, 0,10% do total). O filme que só tinha IMAX, Encounter in the Third Dimension (1999), recebe Adventure, Comedy e Drama. Continuam sem gênero 240 filmes (1.406 avaliações, 0,006%), dos quais só 55 têm 5 ou mais avaliações; eles são excluídos em 2.2-d.
 # - **Ano preenchido:** o IMDb dá o ano de 409 dos 412 filmes sem ano no título (11.747 avaliações); 3 filmes, com 2 avaliações, continuam sem ano.
-# - **Tipos de título:** dos filmes sem gênero no MovieLens, 3.684 são longas no IMDb, 628 são curtas e quase todo o resto são títulos de TV. Na amostra dos 149 títulos de TV preenchidos, título e ano batem com o catálogo (por exemplo, Cosmos, The OA, 13 Reasons Why e Death Note são séries).
+# - **Tipos de título:** dos filmes sem gênero no MovieLens, 3.684 são longas no IMDb, 629 são curtas e quase todo o resto são títulos de TV. Na amostra dos 149 títulos de TV preenchidos, título e ano batem com o catálogo (por exemplo, Cosmos, The OA, 13 Reasons Why e Death Note são séries).
 # - **Por origem:** os filmes preenchidos têm 1,78 gênero por filme, contra 1,87 dos que já tinham gênero. Têm menos Thriller (7,4% contra 15,1%), mais Drama (52,5% contra 44,6%) e mais Musical (3,1% contra 1,8%). O IMDb usa menos Thriller e lista no máximo três gêneros, como a concordância já indicava.
 # - **Conferência da chave:** um código errado na tabela `links` traria o gênero de outro título. A chave foi conferida por código em todos os filmes, fora do notebook (`analises/chave_imdb.py`, resultados em `analises/resultados_chave_imdb.txt`). Nos 57.100 filmes com gênero nas duas fontes (medição feita antes da fusão da 2.2-a), a concordância é de 97,7% com a chave verdadeira e de 40,0% com uma chave sorteada, e continua perto de 97% quando o título difere (traduções, como Hachi-ko e The Story of Hachikō) ou quando o título é curta, série ou episódio. Nenhum filme é excluído.
 # - **Margem de erro:** supondo que uma chave errada concorde como uma chave sorteada, e tomando como controle os filmes que entraram no catálogo na mesma época dos preenchidos (movieId acima de 131.262), cerca de 5,0% dos gêneros preenchidos (240 filmes; 1.359 avaliações, 0,0054% do total) e cerca de 56 dos 409 anos preenchidos (até 94) podem vir de uma chave errada. No usuário mais exposto, os filmes preenchidos são 10,7% das avaliações, o que dá cerca de 0,6 ponto percentual com gênero possivelmente errado.
 #
 # **Limitação:** a concordância mede o quanto as duas fontes rotulam do mesmo jeito, não qual delas está certa. O IMDb atualiza seus gêneros com o tempo; por isso o recorte usado fica identificado pelo MD5. A conferência automática não detecta um homônimo sem ano: o código de Black Mirror aponta para um curta de 2011 com o mesmo nome, e não para a série (esse filme não recebeu gênero, porque o único gênero do curta no IMDb é Short).
 #
-# **Consequência:** o IMDb reduz `Unknown` de 26.627 para 1.406 avaliações; esses 240 filmes não têm tratamento automático e são excluídos em 2.2-d, e `Unknown` deixa de existir. As colunas `origem_genero` e `origem_ano` permitem executar P1 com e sem os valores preenchidos. Num perfil, um filme preenchido entra como qualquer outro: no vetor base (3.1), cada avaliação conta uma vez em cada gênero do filme; no vetor revisado (3.8), o peso de cada avaliação é dividido entre os gêneros do filme.
+# **Consequência:** o IMDb reduz `Unknown` de 26.654 para 1.406 avaliações; esses 240 filmes não têm tratamento automático e são excluídos em 2.2-d, e `Unknown` deixa de existir. As colunas `origem_genero` e `origem_ano` permitem executar P1 com e sem os valores preenchidos. Num perfil, um filme preenchido entra como qualquer outro: no vetor base (3.1), cada avaliação conta uma vez em cada gênero do filme; no vetor revisado (3.8), o peso de cada avaliação é dividido entre os gêneros do filme.
 
 # %% [markdown]
 # #### O gênero previsto pelo público: kNN
@@ -587,17 +599,17 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Validação interna:** nos 24.006 filmes com gênero e pelo menos 10 avaliadores, o kNN acerta 83,4%, contra 47,3% de chutar Drama. O Naive Bayes acerta 69,6%; seu erro, de 30,4%, é a taxa de ruído de referência, e o kNN fica bem abaixo dela (erro de 16,6%). Contar os gêneros vistos pelo público quase não ajuda: de 47% a 54% sem peso e de 49% a 62% com peso 1/√N.
-# - **Por faixa de avaliadores:** o acerto do kNN cresce com o público do filme: 38,2% com 1–2 avaliadores, 55,4% com 3–4, 67,8% com 5–9, 78,0% com 10–49 e 87,8% com 50 ou mais. O desvio-padrão entre as 5 partes fica em até 1 ponto.
-#   - Pelo critério de 10 pontos acima do chute, o mínimo calculado é **3 avaliadores** (3–4: 12,4 pontos acima).
-#   - Com 1–2 avaliadores, o kNN fica 4,5 pontos abaixo do chute: o público de um ou dois usuários não diz nada sobre o filme.
-# - **Validação externa:** nos filmes sem gênero, a concordância do kNN com o IMDb segue a mesma ordem: 66,6% com 5–9 avaliadores, 70,9% com 10–49 e 80,6% com 50 ou mais, contra 48,7% a 58,3% do chute. Com 3–4 avaliadores, o kNN fica só 3,3 pontos acima do chute e empata com a contagem 1/√N (55,8%); com 1–2, fica abaixo do chute.
-# - **Interna × externa:** a vantagem do kNN sobre o chute é menor no teste externo (na faixa 5–9, 14,8 pontos contra 24,1 na validação interna). Os filmes sem gênero não são iguais aos que têm gênero, e o gabarito externo é outra fonte, que rotula de outro jeito.
+# - **Validação interna:** nos 24.005 filmes com gênero e pelo menos 10 avaliadores, o kNN acerta 83,4%, contra 47,3% de chutar Drama. O Naive Bayes acerta 71,1%; seu erro, de 28,9%, é a taxa de ruído de referência, e o kNN fica bem abaixo dela (erro de 16,6%). Contar os gêneros vistos pelo público quase não ajuda: de 47% a 54% sem peso e de 49% a 63% com peso 1/√N.
+# - **Por faixa de avaliadores:** o acerto do kNN cresce com o público do filme: 38,4% com 1–2 avaliadores, 55,5% com 3–4, 67,7% com 5–9, 77,9% com 10–49 e 87,9% com 50 ou mais. O desvio-padrão entre as 5 partes fica em até 1 ponto.
+#   - Pelo critério de 10 pontos acima do chute, o mínimo calculado é **3 avaliadores** (3–4: 12,5 pontos acima).
+#   - Com 1–2 avaliadores, o kNN fica 4,2 pontos abaixo do chute: o público de um ou dois usuários não diz nada sobre o filme.
+# - **Validação externa:** nos filmes sem gênero, a concordância do kNN com o IMDb segue a mesma ordem: 67,1% com 5–9 avaliadores, 71,4% com 10–49 e 75,0% com 50 ou mais, contra 48,9% a 58,3% do chute. Com 3–4 avaliadores, o kNN fica só 3,4 pontos acima do chute e empata com a contagem 1/√N (55,9% contra 55,6%); com 1–2, fica abaixo do chute.
+# - **Interna × externa:** a vantagem do kNN sobre o chute é menor no teste externo (na faixa 5–9, 15,3 pontos contra 24,0 na validação interna). Os filmes sem gênero não são iguais aos que têm gênero, e o gabarito externo é outra fonte, que rotula de outro jeito.
 # - **Exemplo:** St. Giuseppe Moscati: Doctor to the Poor (2007) tem 9 avaliadores e nenhum gênero no MovieLens. Entre os 15 filmes de público mais parecido, 13 têm Drama, e o kNN prevê Drama, que é o gênero do IMDb.
 #
 # **Limitação:** o critério interno aceita a faixa 3–4, mas o teste externo mostra que ali o ganho é pequeno. A faixa 5–9 é a primeira que passa nos dois testes.
 #
-# **Consequência:** o comportamento dos usuários contém a informação de gênero: o kNN recupera o gênero de 83% dos filmes com 10 ou mais avaliadores e concorda com o IMDb nos filmes sem gênero a partir de 5 avaliadores. Como o IMDb já preenche 4.822 dos 5.062 filmes sem gênero e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não é usado para preencher. Esses 55 são quase todos curtas, população em que o kNN não supera o chute (2.2-d).
+# **Consequência:** o comportamento dos usuários contém a informação de gênero: o kNN recupera o gênero de 83% dos filmes com 10 ou mais avaliadores e concorda com o IMDb nos filmes sem gênero a partir de 5 avaliadores. Como o IMDb já preenche 4.823 dos 5.063 filmes sem gênero e só 55 dos 240 restantes têm 5 ou mais avaliações, o kNN não é usado para preencher. Esses 55 são quase todos curtas, população em que o kNN não supera o chute (2.2-d).
 
 # %% [markdown]
 # #### O que não tem tratamento: exclusão
@@ -665,7 +677,7 @@ assert movies_clean.filter(F.col("genres") == "Unknown").limit(1).count() == 0
 #
 # **Limitação:** a exclusão tem direção conhecida: saem sobretudo curtas, vídeos musicais e títulos sem cadastro no IMDb. O efeito no perfil é pequeno, porque esses filmes somam no máximo 5% das avaliações de um usuário.
 #
-# **Consequência:** `Unknown` deixa de existir. O perfil de 3.1 passa a ter 19 gêneros, e P1 não depende de um atributo que registrava falta de informação, e não preferência.
+# **Consequência:** `Unknown` deixa de existir. Com o IMAX fora (2.2), o perfil de 3.1 passa a ter 18 gêneros, e P1 não depende de um atributo que registrava falta de informação, e não preferência.
 
 # %% [markdown]
 # ### 2.3 Integração das tabelas
@@ -945,9 +957,10 @@ print("\n(d) Gênero × grupo de nota nos dados tratados (V de Cramér antes e d
 print(testes_genero_tratado.sort_values("V_cramer_depois", ascending=False).to_string(index=False, float_format=lambda x: f"{x:.4g}"))
 
 fig, axes = plt.subplots(1, 2, figsize=(20, 6))
-mudou = comparacao_generos[comparacao_generos["Δ_avaliacoes"] != 0]
+# IMAX sai inteiro (2.2): fica fora do gráfico, para não esconder as mudanças do preenchimento, e aparece na tabela (b).
+mudou = comparacao_generos[(comparacao_generos["Δ_avaliacoes"] != 0) & (comparacao_generos.index != "IMAX")]
 axes[0].barh(mudou.index, mudou["Δ_avaliacoes"], color=["#d18b24" if v < 0 else "#4682a9" for v in mudou["Δ_avaliacoes"]])
-axes[0].set(title="Avaliações que ganharam ou perderam gênero com o preenchimento", xlabel="Δ avaliações (depois − antes)")
+axes[0].set(title="Avaliações que ganharam ou perderam gênero com o tratamento (sem o IMAX)", xlabel="Δ avaliações (depois − antes)")
 axes[0].grid(axis="x", alpha=.2)
 ordem_v = testes_genero_tratado.sort_values("V_cramer_depois")
 pos = np.arange(len(ordem_v))
@@ -964,8 +977,8 @@ plt.show()
 # **Leitura dos resultados.**
 #
 # - **(a) Nota:** saem 1.577 das 25.000.095 avaliações (2.2-a e 2.2-d), e a proporção de cada nota muda no máximo 0,0006 ponto percentual (nota 4,0). Os histogramas e resumos de 1.5 continuam válidos.
-# - **(b) Gêneros:** `Unknown` deixa de existir: 4.822 filmes (25.221 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. As avaliações vão sobretudo para Drama (+12.749), Comedy (+7.164), Adventure (+4.065), Action (+3.733) e Fantasy (+3.675); esses saldos incluem o efeito da fusão (2.2-a). A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes).
-# - **(c) Filmes preenchidos:** em geral, têm notas menores que a média do gênero: Drama 3,43 contra 3,68, Comedy 3,21 contra 3,42 e Action 3,02 contra 3,47. Horror é a exceção (3,39 contra 3,29). São filmes pouco vistos, e os filmes pouco vistos têm notas mais baixas (consulta "nicho × populares" de 1.7-c). Como pesam no máximo 0,87% das avaliações de um gênero (Documentary), as médias dos gêneros quase não mudam.
+# - **(b) Gêneros:** `Unknown` deixa de existir: 4.823 filmes (25.248 avaliações) recebem o gênero do IMDb e 240 (1.406 avaliações) são excluídos. O IMAX sai da lista de gêneros (195 filmes, 1.063.279 avaliações) e fica fora do gráfico, para não esconder as outras mudanças; as avaliações continuam nos outros gêneros dos filmes. As avaliações vão sobretudo para Drama (+12.776), Comedy (+7.191), Adventure (+4.092), Action (+3.733) e Fantasy (+3.675); esses saldos incluem o efeito da fusão (2.2-a). A média de cada gênero muda no máximo 0,0015 e o desvio-padrão no máximo 0,0013 (os dois em Documentary, que ganha 706 filmes).
+# - **(c) Filmes preenchidos:** em geral, têm notas menores que a média do gênero: Drama 3,43 contra 3,68, Comedy 3,20 contra 3,42 e Action 3,02 contra 3,47. Horror é a exceção (3,39 contra 3,29). São filmes pouco vistos, e os filmes pouco vistos têm notas mais baixas (consulta "nicho × populares" de 1.7-c). Como pesam no máximo 0,87% das avaliações de um gênero (Documentary), as médias dos gêneros quase não mudam.
 # - **(d) Associação gênero × nota:** o V de Cramér de cada gênero muda no máximo 0,0001 (Comedy e Action). Drama continua o gênero mais associado à nota (V = 0,119), e todas as associações seguem fracas.
 #
 # **Consequência:** o tratamento não altera as distribuições estudadas na Seção 1. `Unknown` deixa de existir, e o efeito chega ao perfil por usuário em 3.1.

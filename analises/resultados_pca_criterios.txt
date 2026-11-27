@@ -1,0 +1,47 @@
+Perfil base: 162,541 usuários × 20 atributos (nota média, DP da nota e 18 proporções de gênero, sem IMAX)
+
+=== A. Autovalores (min-max, centralizado, covariância) ===
+ componente  autovalor em escala (%)  acumulada (%)  broken-stick (%)  acima do broken-stick  λ / média dos λ
+          1                   32.157         32.157            17.989                   True            6.431
+          2                   21.619         53.776            12.989                   True            4.324
+          3                   10.662         64.438            10.489                   True            2.132
+          4                    7.354         71.792             8.822                  False            1.471
+          5                    5.123         76.915             7.572                  False            1.025
+          6                    4.919         81.834             6.572                  False            0.984
+          7                    3.572         85.406             5.739                  False            0.714
+          8                    3.180         88.586             5.024                  False            0.636
+          9                    2.287         90.873             4.399                  False            0.457
+         10                    1.952         92.825             3.844                  False            0.390
+         11                    1.397         94.222             3.344                  False            0.279
+         12                    1.246         95.468             2.889                  False            0.249
+         13                    1.079         96.547             2.473                  False            0.216
+         14                    0.910         97.457             2.088                  False            0.182
+         15                    0.758         98.216             1.731                  False            0.152
+         16                    0.599         98.815             1.398                  False            0.120
+         17                    0.429         99.243             1.085                  False            0.086
+         18                    0.308         99.551             0.791                  False            0.062
+         19                    0.263         99.815             0.513                  False            0.053
+         20                    0.185        100.000             0.250                  False            0.037
+
+d′ por critério:
+  broken-stick, último autovalor acima: 3 (64.44% da variância)
+  broken-stick, regra da v9 (primeiros acima): 3 (64.44% da variância)
+  Kaiser-Guttman (λ / média ≥ 1): 5 (76.92% da variância)
+  80% da variância: 6 (81.83% da variância)
+  90% da variância: 9 (90.87% da variância)
+  dimensão de correlação D2 = 6.21 → ⌈D2⌉: 7 (85.41% da variância)
+  ρ-score = 3.93 → ⌈ρ⌉: 4 (71.79% da variância)
+  MLE = 11.47 → ⌈MLE⌉: 12 (95.47% da variância)
+
+=== B. Distribuição dos pares de distância (amostra fixa de 2.000 usuários) ===
+                                 espaço  dimensões  contraste relativo  variância relativa
+                 min-max (20 atributos)         20             22.3971              0.3578
+                  PCA (3): broken-stick          3            851.3989              0.4790
+PCA (5): Kaiser-Guttman (λ / média ≥ 1)          5             94.2478              0.4251
+              PCA (6): 80% da variância          6             64.2670              0.4092
+              PCA (9): 90% da variância          9             33.8524              0.3748
+     PCA (7): dimensão de correlação D2          7             39.8242              0.3929
+                       PCA (4): ρ-score          4            150.5248              0.4378
+                          PCA (12): MLE         12             27.6623              0.3661
+
+Figura: analises/pca_criterios_distancias.png

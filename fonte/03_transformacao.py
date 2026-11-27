@@ -3,11 +3,11 @@
 #
 # A transformação prepara a representação que P1 usará:
 #
-# - **3.1** — construção do perfil por usuário: as avaliações são convertidas em proporções;
+# - **3.1** — construção do perfil por usuário: as avaliações são convertidas em proporções, e o desvio-padrão da nota é medido em cada gênero;
 # - **3.2** — seleção de características;
 # - **3.3** — normalização;
-# - **3.4** — transformação de características por PCA e escolha de d′;
-# - **3.5** — efeito da dimensionalidade sobre as distâncias e dimensionalidade intrínseca;
+# - **3.4** — transformação de características por PCA e escolha de d′ por quatro critérios;
+# - **3.5** — efeito da dimensionalidade sobre as distâncias e dimensionalidade intrínseca, global e no público de cada gênero;
 # - **3.6** — visualização do espaço transformado;
 # - **3.7** — preparação para o agrupamento: valores atípicos e tendência de agrupamento;
 # - **3.8** — vetor revisado: atributos derivados, proporções fracionárias e limite de gêneros;
@@ -42,39 +42,69 @@ atributos_estruturados = ["prop_avaliacoes_total", "nota_media", "nota_dp", "pro
 
 # Ordem fixa por userId: as amostras com semente (3.5 a 3.9) sorteiam os mesmos usuários em qualquer máquina.
 perfil_pd = perfil_completo.select("userId", "n_avaliacoes", *atributos_estruturados).orderBy("userId").toPandas()
-assert len(lista_generos) == 19 and "Unknown" not in lista_generos  # filmes sem gênero excluídos em 2.2-d
+assert len(lista_generos) == 18 and not {"Unknown", "IMAX"} & set(lista_generos)  # 2.2 (IMAX) e 2.2-d (sem gênero)
 assert len(perfil_pd) == perfil_pd.userId.nunique() == n_usuarios_total
 assert perfil_pd[atributos_estruturados].notna().all().all()
 assert perfil_pd[cols_prop].ge(0).all().all() and perfil_pd[cols_prop].le(1).all().all()
 assert abs(perfil_pd["prop_avaliacoes_total"].sum() - 1) < 1e-10
-print(f"Perfil: {len(perfil_pd):,} usuários × {len(atributos_estruturados)} atributos "
-      "(userId e n_avaliacoes ficam fora da matriz e servem para identificar e descrever grupos).")
+
+# dp_<gênero> = desvio-padrão das notas do usuário nos filmes do gênero; só existe com 2 ou mais avaliações no gênero.
+MIN_AVAL_DP = 2
+cols_dp = ["dp_" + sufixo[g] for g in lista_generos]
+dp_genero_pd = (ratings_genres.groupBy("userId", "genre")
+    .agg(F.count("*").alias("n"), F.stddev("rating").alias("dp"))
+    .filter(F.col("n") >= MIN_AVAL_DP)
+    .groupBy("userId").pivot("genre", lista_generos).agg(F.first("dp"))
+    .toPandas()
+    .rename(columns={g: "dp_" + sufixo[g] for g in lista_generos}))
+perfil_pd = perfil_pd.merge(dp_genero_pd, on="userId", how="left")
+assert len(perfil_pd) == n_usuarios_total and perfil_pd[cols_dp].stack().ge(0).all()
+# Conferência num caso: o desvio de Drama do primeiro usuário, recalculado das notas dele.
+notas_u0 = np.array([r["rating"] for r in ratings_genres.filter(
+    (F.col("userId") == int(perfil_pd["userId"].iloc[0])) & (F.col("genre") == "Drama")).select("rating").collect()])
+if len(notas_u0) >= MIN_AVAL_DP:
+    assert np.isclose(perfil_pd["dp_drama"].iloc[0], notas_u0.std(ddof=1))
+    print(f"Conferência: usuário {int(perfil_pd['userId'].iloc[0])}, {len(notas_u0)} notas de Drama, "
+          f"desvio-padrão {notas_u0.std(ddof=1):.4f} = dp_drama {perfil_pd['dp_drama'].iloc[0]:.4f}")
+
+print(f"Perfil: {len(perfil_pd):,} usuários × {len(atributos_estruturados)} atributos, mais {len(cols_dp)} desvios-padrão "
+      "por gênero (userId e n_avaliacoes ficam fora da matriz e servem para identificar e descrever grupos).")
 print(perfil_pd[atributos_estruturados].describe().T[["mean", "std", "min", "50%", "max"]].round(4).to_string())
+print(f"\nDesvio-padrão da nota por gênero (usuários com {MIN_AVAL_DP} ou mais avaliações no gênero):")
+resumo_dp = perfil_pd[cols_dp].describe().T[["count", "mean", "std", "min", "50%", "max"]]
+resumo_dp.insert(1, "%_usuarios", 100 * resumo_dp["count"] / len(perfil_pd))
+print(resumo_dp.sort_values("count", ascending=False).round(4).to_string())
 
 # %% [markdown]
-# **Leitura dos resultados.** Em média, 44,3% das avaliações de um usuário são de filmes de Drama, 34,8% de Comedy e 31,4% de Action. Gêneros como Documentary (0,8%) e Film-Noir (0,9%) têm proporções pequenas. As proporções de gênero de um usuário somam mais que 1 porque os gêneros se sobrepõem.
+# **Leitura dos resultados.** Em média, 44,3% das avaliações de um usuário são de filmes de Drama, 34,8% de Comedy e 31,4% de Action. Gêneros como Documentary (0,8%) e Film-Noir (0,9%) têm proporções pequenas. As proporções de gênero de um usuário somam mais que 1 porque os gêneros se sobrepõem. O desvio-padrão da nota por gênero existe para 99,9% dos usuários em Drama e para só 21,7% em Documentary e 23,6% em Film-Noir; a conferência recalcula o desvio de Drama do primeiro usuário a partir das 53 notas dele.
 
 # %% [markdown]
 # #### Histogramas dos atributos do perfil
 #
-# Todos os atributos do perfil aparecem como histograma, com a média e média ± 1 desvio-padrão marcadas. O número de avaliações e a participação no total usam eixo logarítmico, por causa da assimetria. A tabela registra média, desvio-padrão, mediana, assimetria e a porcentagem de usuários com valor zero.
+# Todos os atributos do perfil aparecem como histograma, com a média e média ± 1 desvio-padrão marcadas. O número de avaliações e a participação no total usam eixo logarítmico, por causa da assimetria. Os desvios-padrão da nota em cada gênero (em verde) só existem para quem tem 2 ou mais avaliações no gênero; o n de cada painel mostra quantos usuários têm o valor. A tabela registra média, desvio-padrão, mediana, assimetria, a porcentagem de usuários com valor zero e a porcentagem com valor.
 
 # %%
 # [3.1-b] Histogramas dos atributos do perfil, com média e desvio-padrão
-atributos_histograma = ["n_avaliacoes"] + atributos_estruturados
-fig, axes = plt.subplots(5, 5, figsize=(26, 22))
+atributos_histograma = ["n_avaliacoes"] + atributos_estruturados + cols_dp
+n_linhas = int(np.ceil(len(atributos_histograma) / 6))
+fig, axes = plt.subplots(n_linhas, 6, figsize=(30, 4.3 * n_linhas))
 for ax, atributo in zip(axes.flat, atributos_histograma):
     escala_log = atributo in ("n_avaliacoes", "prop_avaliacoes_total")
-    rotulo = "eixo log" if escala_log else ("proporção das avaliações do usuário" if atributo.startswith("prop_") else "nota")
-    histograma_media_dp(ax, perfil_pd[atributo], atributo, bins=40, log_x=escala_log,
-                        cor="#d18b24" if escala_log else "#4682a9", rotulo_x=rotulo)
+    if atributo in cols_dp:
+        cor, rotulo = "#3f8f6b", "desvio-padrão da nota no gênero"
+    else:
+        cor = "#d18b24" if escala_log else "#4682a9"
+        rotulo = "eixo log" if escala_log else ("proporção das avaliações do usuário" if atributo.startswith("prop_") else "nota")
+    histograma_media_dp(ax, perfil_pd[atributo], atributo, bins=40, log_x=escala_log, cor=cor, rotulo_x=rotulo)
 for ax in axes.flat[len(atributos_histograma):]:
     ax.axis("off")
-fig.suptitle(f"Atributos do perfil por usuário (n = {len(perfil_pd):,}); média e ± 1 DP em vermelho", y=1.005)
+fig.suptitle(f"Atributos do perfil por usuário (n = {len(perfil_pd):,}); média e ± 1 DP em vermelho; "
+             "desvio-padrão da nota por gênero em verde", y=1.005)
 plt.tight_layout()
 plt.show()
 resumo_perfil = perfil_pd[atributos_histograma].agg(["mean", "std", "median", "skew"]).T
 resumo_perfil["%_zeros"] = 100 * (perfil_pd[atributos_histograma] == 0).mean()
+resumo_perfil["%_com_valor"] = 100 * perfil_pd[atributos_histograma].notna().mean()
 print(resumo_perfil.round(4).to_string())
 
 # %% [markdown]
@@ -83,9 +113,10 @@ print(resumo_perfil.round(4).to_string())
 # - **Volume:** o número de avaliações por usuário tem assimetria de 16,3 (média 153,8, mediana 71); a participação no total herda a mesma forma.
 # - **Nota:** a nota média tem assimetria −0,56 (média 3,68); o DP da nota é zero para 0,15% dos usuários, que deram sempre a mesma nota.
 # - **Gêneros comuns** (Drama, Comedy, Action, Thriller): distribuições próximas de simétricas, com menos de 0,4% de zeros.
-# - **Gêneros raros:** a maioria dos usuários tem proporção zero em Documentary (62,8%), Film-Noir (58,3%), Western (32,3%), IMAX (26,8%) e Musical (22,4%). A cauda dos poucos usuários que avaliam esses gêneros explica os valores z extremos de 3.3 e os atípicos de 3.7.
+# - **Gêneros raros:** a maioria dos usuários tem proporção zero em Documentary (62,8%) e Film-Noir (58,3%), e uma parte grande, em Western (32,3%) e Musical (22,4%). A cauda dos poucos usuários que avaliam esses gêneros explica os valores z extremos de 3.3.
+# - **Desvio-padrão da nota por gênero (em verde):** a média vai de 0,63 (Film-Noir) a 0,93 (Comedy), sempre abaixo ou igual ao desvio geral médio (0,93): dentro de um gênero, o usuário varia as notas um pouco menos do que no conjunto. Os valores zero, de quem deu a mesma nota a todos os filmes do gênero, chegam a 6,6% em Animation e 6,3% em War e Musical, quase sempre em usuários com 2 ou 3 avaliações no gênero. A distribuição é assimétrica à direita (assimetria de 0,42 a 1,25).
 #
-# **Consequência:** os gêneros raros pedem tratamento próprio. O vetor revisado (3.8) os agrupa, e a atividade entra em escala logarítmica.
+# **Consequência:** os gêneros raros pedem tratamento próprio. O vetor revisado (3.8) os agrupa, e a atividade entra em escala logarítmica. O desvio por gênero falta para muitos usuários nos gêneros raros e é instável com poucas avaliações; por isso entra no vetor revisado numa forma relativa e definida para todos (3.8).
 
 # %% [markdown]
 # ### 3.2 Seleção de características
@@ -94,11 +125,13 @@ print(resumo_perfil.round(4).to_string())
 #
 # O CFS procura atributos correlacionados com a classe e pouco correlacionados entre si. Sem classe, só a segunda parte se aplica: os pares são ordenados pelo valor absoluto da correlação, em ordem decrescente. Fisher e ReliefF exigem classes. Depois de P1, eles podem usar os grupos encontrados como classe, mas para **descrever** quais atributos separam os grupos, não para escolher a entrada.
 #
-# **Critério registrado:** |Pearson| e |Spearman| ≥ 0,9 indicam redundância forte. O limiar é uma escolha explícita e pode ser revisto. Em cada par redundante, mantém-se o atributo que usa a escala completa da nota.
+# **Critério registrado:** |Pearson| e |Spearman| ≥ 0,8 indicam redundância forte. O limiar é uma escolha explícita (na versão anterior era 0,9). Dois atributos têm decisão própria, registrada no código: `prop_positivas`, que repete a nota média e depende de um limiar de nota positiva ainda a validar, e `prop_avaliacoes_total`, que mede atividade. Nos demais pares redundantes, a regra é automática: sai o atributo com maior |Pearson| médio com os demais, porque é o que mais repete o resto do perfil.
+#
+# Os desvios-padrão da nota por gênero (3.1) descrevem o perfil, mas não entram nesta seleção nem no vetor base: faltam para quem tem menos de 2 avaliações no gênero (até 78% dos usuários nos gêneros raros). Eles entram no vetor revisado (3.8), numa forma definida para todos os usuários.
 
 # %%
 # [3.2] Seleção de características por filtro: redundância entre atributos
-LIMIAR_REDUNDANCIA = 0.9
+LIMIAR_REDUNDANCIA = 0.8
 pearson_perfil = perfil_pd[atributos_estruturados].corr(method="pearson")
 spearman_perfil = perfil_pd[atributos_estruturados].corr(method="spearman")
 ranking = pd.DataFrame(
@@ -118,11 +151,19 @@ decisoes = {
     "prop_positivas": "removido por redundância com nota_media; depende de um limiar de nota ainda a validar",
     "prop_avaliacoes_total": "fora da distância: mede atividade, é muito assimétrico e dominaria a distância; descreve grupos",
 }
-pares_sem_decisao = redundantes[~redundantes["atributo_1"].isin(decisoes) & ~redundantes["atributo_2"].isin(decisoes)]
-if len(pares_sem_decisao):
-    print("ATENÇÃO: pares redundantes sem decisão registrada:")
-    print(pares_sem_decisao.to_string(index=False))
 atributos_p1 = [a for a in atributos_estruturados if a not in decisoes]
+# Pares redundantes sem decisão registrada: sai o atributo com maior |Pearson| médio com os demais atributos que restam.
+while True:
+    restantes = redundantes[redundantes["atributo_1"].isin(atributos_p1) & redundantes["atributo_2"].isin(atributos_p1)]
+    if not len(restantes):
+        break
+    a, b = restantes.iloc[0][["atributo_1", "atributo_2"]]
+    media_abs = (pearson_perfil.loc[atributos_p1, atributos_p1].abs().sum() - 1) / (len(atributos_p1) - 1)
+    sai, fica = (a, b) if media_abs[a] >= media_abs[b] else (b, a)
+    decisoes[sai] = (f"redundante com {fica} (Pearson {pearson_perfil.loc[sai, fica]:.3f}; Spearman "
+                     f"{spearman_perfil.loc[sai, fica]:.3f}); maior |Pearson| médio com os demais "
+                     f"({media_abs[sai]:.3f} contra {media_abs[fica]:.3f})")
+    atributos_p1.remove(sai)
 for atributo, motivo in decisoes.items():
     print(f"- {atributo}: {motivo}")
 print(f"Entrada candidata de P1 ({len(atributos_p1)} atributos):", ", ".join(atributos_p1))
@@ -137,6 +178,9 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
+# **Leitura dos resultados.** Com o limiar de 0,8, dois pares passam nos dois critérios: `nota_media × prop_positivas` (Pearson 0,922; Spearman 0,946), que tem decisão própria, e `prop_animation × prop_children` (0,823 e 0,804). No segundo, sai `prop_children`, que tem o maior |Pearson| médio com os demais (0,267 contra 0,227): Animation fica e representa o público de animação e infantil no vetor base. O terceiro par mais associado, `prop_action × prop_adventure` (0,674 e 0,694), fica longe do limiar. O vetor base tem 19 atributos: nota média, desvio-padrão da nota e 17 proporções de gênero.
+
+# %% [markdown]
 # ### 3.3 Normalização: padronização × re-escala
 #
 # A escala muda o peso de cada atributo na distância e no erro do PCA. Duas opções são comparadas:
@@ -145,13 +189,15 @@ plt.show()
 # - **Re-escala min-max:** leva cada atributo para [0, 1] e preserva diferenças de variância entre atributos.
 #
 # A coluna `peso_var` mostra a variância do atributo dividida pela soma das variâncias. Ela indica a participação média do atributo na distância euclidiana ao quadrado entre dois usuários.
+#
+# **Escala usada a partir de 3.4: min-max.** O z-score dá a gêneros raros, com pouca variação, o mesmo peso dos gêneros comuns e cria valores extremos (a tabela abaixo mostra máximos de dezenas de desvios-padrão). O min-max mantém cada atributo em [0, 1] e preserva a diferença de variância entre eles. O z-score fica só como comparação nesta célula e no critério univariado |z| de 3.7-a.
 
 # %%
 # [3.3] Normalização: padronização z-score × re-escala min-max
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 X_p1_original = perfil_pd[atributos_p1].astype(float)
-assert X_p1_original.shape == (n_usuarios_total, 21)
+assert X_p1_original.shape == (n_usuarios_total, len(atributos_p1)) and "prop_positivas" not in atributos_p1
 assert np.isfinite(X_p1_original.to_numpy()).all()
 
 scaler_p1 = StandardScaler()
@@ -175,127 +221,269 @@ extremos = (X_p1_padronizado.abs() > 10).sum()
 print("Usuários com |z| > 10 por atributo:", extremos[extremos > 0].to_dict())
 
 # %% [markdown]
+# **Leitura dos resultados.** No z-score, cada atributo pesa 5,26% da variância total, mas os gêneros raros ganham valores extremos: máximos de 47,1 desvios-padrão em Documentary, 38,9 em Western e 38,2 em Film-Noir, e há 854 casos de |z| > 10 (usuário e gênero), quase todos em gêneros raros e médios (Horror 193, Film-Noir 160, Documentary 137). No min-max, os gêneros frequentes pesam mais na distância (Action 12,62%, Drama 11,07%, Comedy 10,04%) e os raros quase nada (Documentary 0,25%, Western 0,36%, Film-Noir 0,38%). É essa diferença de variância que o PCA em min-max preserva.
+
+# %% [markdown]
 # ### 3.4 PCA e escolha de d′
 #
-# O PCA é aplicado à matriz padronizada, que já está centrada e em escala comparável. Nesse caso, a covariância equivale à matriz de correlação.
+# O PCA é aplicado à matriz min-max. Cada atributo é centralizado na média, e os componentes são os autovetores da matriz de covariância, ordenados pelos autovalores. Os autovalores **em escala** (cada um dividido pela soma de todos) dizem que fração da variância total cada componente guarda e somam 1.
 #
-# Critérios para escolher d′:
+# O número de componentes d′ é escolhido por quatro critérios, de três tipos:
 #
-# - **Scree plot** com variância explicada e acumulada; o limiar de 80% é um parâmetro registrado;
-# - **Broken-stick:** retém os componentes iniciais cuja variância supera a esperada para autovalores aleatórios;
-# - **Kaiser-Guttman:** retém autovalores ≥ 1 em dados padronizados.
+# - **gráfico:** scree plot com a variância acumulada; d′ é o menor número de componentes que soma 80% da variância (limiar registrado);
+# - **estatístico, broken-stick:** compara cada autovalor em escala com o esperado se a variância fosse repartida ao acaso (distribuição broken-stick) e retém os componentes iniciais que ficam acima da curva. Se autovalores do fim também ficarem acima, isso é registrado à parte: no fim, a curva tende a zero mais depressa que os autovalores de atributos fracos e quase independentes, e esses cruzamentos não indicam estrutura;
+# - **estatístico, Kaiser-Guttman:** retém os autovalores maiores ou iguais à média dos autovalores, que é o limiar unitário em escala;
+# - **dimensão intrínseca:** estimada pela distribuição das distâncias entre usuários, sem depender dos eixos do PCA. A dimensão de correlação (fractal) D2 é a inclinação de log C(r) × log r, em que C(r) é a fração dos pares de usuários a uma distância de até r. O ρ-score é μ² / (2σ²), com μ e σ a média e o desvio-padrão das distâncias. Em cada estimador, d′ = ⌈D⌉.
 #
-# Cada critério tem seu próprio viés. A matriz PCA é uma alternativa a comparar em P1, não uma substituição obrigatória dos 21 atributos.
+# **Regra fixada antes da execução:** o PCA principal usa d′ = ⌈D2⌉, porque a dimensão intrínseca mede a estrutura dos dados, e não só a variância dos eixos. O broken-stick, o mais compacto, é a alternativa nas seções seguintes. Os quatro critérios são comparados nas distâncias (3.5), e a escolha final entre os espaços é de P1.
 
 # %%
-# [3.4] PCA sobre a matriz padronizada e critérios para d'
+# [3.4] PCA sobre a matriz min-max e os critérios para d′
+import math
+from scipy.spatial.distance import pdist
 from sklearn.decomposition import PCA
 
-pca_completo = PCA(svd_solver="full").fit(X_p1_padronizado)
-autovalores = pca_completo.explained_variance_
-p = len(autovalores)
-prop_var = pca_completo.explained_variance_ratio_
-acumulada = np.cumsum(prop_var)
-broken_stick = np.array([sum(1 / i for i in range(k, p + 1)) / p for k in range(1, p + 1)])
+LIMIAR_VARIANCIA, N_AMOSTRA_D2, N_AMOSTRA_RHO, SEMENTES_RHO = 0.80, 5000, 2000, range(5)
+FAIXA_D2 = (-3.0, -0.7)  # raios do quantil 0,1% ao 20% das distâncias: região de escala do ajuste
 
-LIMIAR_VARIANCIA = 0.80
-d_kaiser = int((autovalores >= 1).sum())
-acima_broken = prop_var > broken_stick
-d_broken = p if acima_broken.all() else int(np.argmin(acima_broken))
-d_variancia = int(np.searchsorted(acumulada, LIMIAR_VARIANCIA) + 1)
 
-tabela_pca = pd.DataFrame({
-    "componente": np.arange(1, p + 1), "autovalor": autovalores, "variancia_%": 100 * prop_var,
-    "acumulada_%": 100 * acumulada, "broken_stick_%": 100 * broken_stick}).round(4)
-print(tabela_pca.to_string(index=False))
-print(f"d' por Kaiser-Guttman (autovalor >= 1): {d_kaiser}")
-print(f"d' por broken-stick: {d_broken}")
-print(f"d' para {LIMIAR_VARIANCIA:.0%} da variância acumulada: {d_variancia}")
+def dimensao_correlacao(X, semente=42, n=N_AMOSTRA_D2, faixa=FAIXA_D2):
+    """D2: inclinação de log C(r) × log r numa amostra fixa; C(r) = fração dos pares com distância até r."""
+    X = np.asarray(X, dtype=float)
+    amostra = X[np.random.default_rng(semente).choice(len(X), min(n, len(X)), replace=False)]
+    dist = np.sort(pdist(amostra))
+    dist = dist[dist > 0]
+    raios = np.quantile(dist, np.logspace(faixa[0], faixa[1], 25))
+    C = np.searchsorted(dist, raios, side="right") / len(dist)
+    return float(np.polyfit(np.log(raios), np.log(C), 1)[0]), raios, C
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 4.5))
-axes[0].plot(range(1, p + 1), autovalores, "o-", color="#397461", label="autovalores")
-axes[0].axhline(1, ls="--", color="gray", label="Kaiser-Guttman = 1")
-axes[0].set(title="Scree plot", xlabel="Componente", ylabel="Autovalor")
-axes[0].legend()
-axes[1].bar(range(1, p + 1), 100 * prop_var, color="#397461", label="variância explicada")
-axes[1].plot(range(1, p + 1), 100 * broken_stick, "o-", color="#d18b24", label="broken-stick")
-axes[1].plot(range(1, p + 1), 100 * acumulada, "s--", color="#4682a9", label="acumulada")
-axes[1].axhline(100 * LIMIAR_VARIANCIA, ls=":", color="gray")
-axes[1].set(title="Variância explicada por componente (%)", xlabel="Componente", ylabel="%")
-axes[1].legend()
-for ax in axes:
-    ax.grid(alpha=.2)
+
+def rho_score(X, sementes=SEMENTES_RHO, n=N_AMOSTRA_RHO):
+    """ρ = μ² / (2σ²) dos pares de distância; mediana entre amostras fixas."""
+    X = np.asarray(X, dtype=float)
+    valores = []
+    for s in sementes:
+        dist = pdist(X[np.random.default_rng(s).choice(len(X), min(n, len(X)), replace=False)])
+        dist = dist[dist > 0]
+        valores.append(float(dist.mean() ** 2 / (2 * dist.var())))
+    return float(np.median(valores)), valores
+
+
+def criterios_pca(X_minmax):
+    """PCA da matriz min-max (centralizada; autovalores da covariância) e o d′ de cada critério."""
+    pca = PCA(svd_solver="full").fit(X_minmax)
+    autoval = pca.explained_variance_
+    d = len(autoval)
+    escala = autoval / autoval.sum()
+    acum = np.cumsum(escala)
+    broken = np.array([sum(1 / j for j in range(i, d + 1)) / d for i in range(1, d + 1)])
+    acima = escala > broken
+    d2, raios, C = dimensao_correlacao(X_minmax)
+    rho, rhos = rho_score(X_minmax)
+    criterios = {
+        "gráfico: 80% da variância": int(np.searchsorted(acum, LIMIAR_VARIANCIA) + 1),
+        "broken-stick": max(1, int(np.argmax(~acima)) if (~acima).any() else d),  # componentes iniciais acima da curva
+        "Kaiser-Guttman": int((autoval / autoval.mean() >= 1).sum()),
+        "dimensão intrínseca: D2": min(d, math.ceil(d2)),
+        "dimensão intrínseca: ρ-score": min(d, math.ceil(rho)),
+    }
+    return {"pca": pca, "autoval": autoval, "escala": escala, "acum": acum, "broken": broken, "acima": acima,
+            "d2": d2, "raios": raios, "C": C, "rho": rho, "rhos": rhos, "criterios": criterios}
+
+
+CORES_CRITERIO = {"gráfico: 80% da variância": "#4682a9", "broken-stick": "#d18b24", "Kaiser-Guttman": "#7656a5",
+                  "dimensão intrínseca: D2": "crimson", "dimensão intrínseca: ρ-score": "#3f8f6b"}
+
+
+def grafico_criterios(ax_scree, ax_acum, res, titulo):
+    """Scree plot com broken-stick e Kaiser-Guttman, e variância acumulada com o d′ de cada critério."""
+    d = len(res["escala"])
+    pos = np.arange(1, d + 1)
+    ax_scree.bar(pos, 100 * res["escala"], color="#9db8cc", label="autovalor em escala")
+    ax_scree.plot(pos, 100 * res["broken"], "o-", ms=3, color="#d18b24", label="broken-stick")
+    ax_scree.axhline(100 / d, ls="--", color="#7656a5", label="Kaiser-Guttman: média dos autovalores")
+    ax_acum.plot(pos, 100 * res["acum"], "s-", ms=3, color="#4682a9", label="variância acumulada")
+    ax_acum.axhline(100 * LIMIAR_VARIANCIA, ls=":", color="gray")
+    for nome, v in res["criterios"].items():
+        ax_scree.axvline(v + 0.5, color=CORES_CRITERIO[nome], ls=":", lw=1.6)
+        ax_acum.plot(v, 100 * res["acum"][v - 1], "o", color=CORES_CRITERIO[nome], ms=9, alpha=.8,
+                     label=f"{nome}: d′ = {v}")
+    ax_scree.set(title=f"Scree plot: {titulo}", xlabel="componente (linhas pontilhadas: d′ de cada critério)",
+                 ylabel="% da variância")
+    ax_acum.set(title=f"Variância acumulada e d′ de cada critério: {titulo}", xlabel="componentes", ylabel="%",
+                ylim=(0, 102))
+    ax_scree.legend(fontsize=8)
+    ax_acum.legend(fontsize=8, loc="lower right")
+    for ax in (ax_scree, ax_acum):
+        ax.grid(alpha=.2)
+
+
+def imprimir_criterios(res):
+    d = len(res["escala"])
+    tabela = pd.DataFrame({"componente": np.arange(1, d + 1), "autovalor": res["autoval"],
+                           "em escala (%)": 100 * res["escala"], "acumulada (%)": 100 * res["acum"],
+                           "broken-stick (%)": 100 * res["broken"], "acima do broken-stick": res["acima"],
+                           "autovalor / média": res["autoval"] / res["autoval"].mean()})
+    print(tabela.round(4).to_string(index=False))
+    print(f"\nD2 = {res['d2']:.2f}; ρ-score = {res['rho']:.2f} (mediana de {len(res['rhos'])} amostras: "
+          + ", ".join(f"{v:.2f}" for v in res["rhos"]) + ")")
+    print("d′ por critério:")
+    for nome, v in res["criterios"].items():
+        print(f"  {nome}: {v} ({100 * res['acum'][v - 1]:.2f}% da variância)")
+    cauda = [int(i) + 1 for i in np.flatnonzero(res["acima"]) if i + 1 > res["criterios"]["broken-stick"]]
+    if cauda:
+        print(f"  broken-stick: autovalores do fim também acima da curva: {cauda} (a regra do último acima daria {max(cauda)})")
+    else:
+        print("  broken-stick: nenhum autovalor do fim acima da curva (as regras dos primeiros acima e do último acima coincidem)")
+
+
+res_base = criterios_pca(X_p1_minmax)
+pca_completo, acumulada = res_base["pca"], res_base["acum"]
+print(f"PCA sobre a matriz min-max ({X_p1_minmax.shape[1]} atributos), centralizada; autovalores da covariância")
+imprimir_criterios(res_base)
+
+# Sensibilidade da dimensão de correlação à faixa de raios do ajuste e à semente da amostra.
+sens_d2 = pd.DataFrame([(f"quantis {100 * 10 ** f[0]:.2g}% a {100 * 10 ** f[1]:.2g}%", s,
+                         dimensao_correlacao(X_p1_minmax, s, faixa=f)[0])
+                        for f in [FAIXA_D2, (-3.5, -1.0), (-2.5, -0.5)] for s in (42, 7, 123)],
+                       columns=["faixa de raios", "semente", "D2"])
+print("\nSensibilidade de D2 (faixa de raios × semente da amostra de 5.000 usuários):")
+print(sens_d2.pivot(index="faixa de raios", columns="semente", values="D2").round(2).to_string())
+
+fig, axes = plt.subplots(1, 3, figsize=(25, 5.8))
+grafico_criterios(axes[0], axes[1], res_base, "vetor base")
+ajuste = np.polyfit(np.log(res_base["raios"]), np.log(res_base["C"]), 1)
+axes[2].loglog(res_base["raios"], res_base["C"], "o", color="crimson", ms=4, label="C(r) observado")
+axes[2].loglog(res_base["raios"], np.exp(np.polyval(ajuste, np.log(res_base["raios"]))), "-", color="gray",
+               label=f"reta ajustada: inclinação D2 = {res_base['d2']:.2f}")
+axes[2].set(title="Dimensão de correlação: log C(r) × log r", xlabel="raio r",
+            ylabel="C(r): fração dos pares com distância ≤ r")
+axes[2].legend(fontsize=8)
+axes[2].grid(alpha=.2, which="both")
 plt.tight_layout()
 plt.show()
 
-# Candidato registrado: Kaiser-Guttman, por ser o critério estatístico definido para dados padronizados.
-d_pca = d_kaiser
-assert 1 <= d_pca <= p
+# Regra fixada antes: PCA principal com d′ = ⌈D2⌉; alternativa compacta: broken-stick.
+d_pca, d_bs = res_base["criterios"]["dimensão intrínseca: D2"], res_base["criterios"]["broken-stick"]
+assert 1 <= d_pca <= len(acumulada) and 1 <= d_bs <= len(acumulada)
+print(f"\nd′ escolhido: {d_pca} componentes pela dimensão intrínseca (D2 = {res_base['d2']:.2f}); "
+      f"alternativa compacta: {d_bs} pelo broken-stick")
 cargas = pd.DataFrame(pca_completo.components_[:d_pca].T, index=atributos_p1,
                       columns=[f"CP{k}" for k in range(1, d_pca + 1)])
 print("Atributos com maior carga absoluta em cada componente retido:")
 for cp in cargas.columns:
     principais = cargas[cp].abs().sort_values(ascending=False).head(4).index
-    print(f"{cp}: " + ", ".join(f"{a} ({cargas.loc[a, cp]:+.2f})" for a in principais))
-X_p1_pca = pd.DataFrame(pca_completo.transform(X_p1_padronizado)[:, :d_pca], columns=cargas.columns, index=perfil_pd.index)
+    print(f"{cp} ({100 * res_base['escala'][int(cp[2:]) - 1]:.2f}%): "
+          + ", ".join(f"{a} ({cargas.loc[a, cp]:+.2f})" for a in principais))
+projecao_base = pca_completo.transform(X_p1_minmax)
+X_p1_pca = pd.DataFrame(projecao_base[:, :d_pca], columns=cargas.columns, index=perfil_pd.index)
+X_p1_pca_bs = pd.DataFrame(projecao_base[:, :d_bs], columns=[f"CP{k}" for k in range(1, d_bs + 1)], index=perfil_pd.index)
 print(f"Matriz candidata no espaço PCA: {X_p1_pca.shape}; variância retida = {100 * acumulada[d_pca - 1]:.2f}%")
-# Alternativa para comparação nas seções seguintes: os componentes que somam 80% da variância.
-X_p1_pca80 = pd.DataFrame(pca_completo.transform(X_p1_padronizado)[:, :d_variancia],
-                          columns=[f"CP{k}" for k in range(1, d_variancia + 1)], index=perfil_pd.index)
-print(f"Alternativa para comparação: PCA com {d_variancia} componentes ({100 * acumulada[d_variancia - 1]:.2f}% da variância)")
+print(f"Alternativa compacta (broken-stick): {X_p1_pca_bs.shape}; variância retida = {100 * acumulada[d_bs - 1]:.2f}%")
+
+# %% [markdown]
+# **Leitura dos resultados.**
+#
+# - **Autovalores:** os três primeiros componentes guardam 33,36%, 20,70% e 10,85% da variância (64,91% juntos), e só eles ficam acima da curva broken-stick, o terceiro por pouco (10,85% contra 10,78%). Do 4º em diante, todos ficam abaixo, inclusive no fim: com min-max e covariância, os últimos autovalores não voltam a cruzar a curva.
+# - **d′ de cada critério:**
+#
+#   | Critério | d′ | variância retida |
+#   |---|---:|---:|
+#   | estatístico: broken-stick | 3 | 64,91% |
+#   | estatístico: Kaiser-Guttman (autovalor ≥ média) | 4 | 72,46% |
+#   | dimensão intrínseca: ρ-score = 3,95 | 4 | 72,46% |
+#   | gráfico: 80% da variância | 6 | 82,07% |
+#   | dimensão intrínseca: D2 = 6,17 | 7 | 85,73% |
+#
+#   No Kaiser-Guttman, o 4º autovalor vale 1,43 vez a média, e o 5º, 0,97. O ρ-score varia de 3,87 a 4,14 entre as 5 amostras; a mediana (3,95) dá 4, mas uma amostra isolada poderia dar 5.
+# - **Sensibilidade de D2:** a semente da amostra muda D2 em no máximo 0,08. A faixa de raios do ajuste muda mais: 6,9 com raios menores (quantis de 0,032% a 10%) e 5,5 com raios maiores (0,32% a 32%), ou seja, ⌈D2⌉ entre 6 e 7. Em raios pequenos, o ruído acrescenta dimensões; em raios grandes, o limite do domínio [0, 1] as reduz. A faixa registrada fica no meio. No gráfico, os pontos de log C(r) × log r formam uma curva suave, mais inclinada nos raios pequenos e menos nos grandes; por isso D2 depende da faixa, como mostra a tabela de sensibilidade.
+# - **Componentes do PCA principal (7):**
+#   - CP1 (33,4%): Action, Adventure e Sci-Fi contra Drama;
+#   - CP2 (20,7%): Comedy contra Drama, Thriller e Crime;
+#   - CP3 (10,8%): desvio-padrão da nota contra nota média, ou seja, quem varia mais as notas contra quem dá notas altas;
+#   - CP4 (7,5%): Comedy contra desvio-padrão da nota e Drama;
+#   - CP5 (5,1%): Horror contra Action; CP6 (4,5%): Sci-Fi contra Crime, Animation e Fantasy; CP7 (3,7%): nota média e desvio-padrão contra Romance e Thriller.
+#
+# **Interpretação:** os critérios vão de 3 a 7 componentes. Os estatísticos e o ρ-score são os mais compactos (3 e 4); o gráfico e D2 guardam mais (6 e 7). Pela regra fixada, o PCA principal tem 7 componentes (85,73% da variância), e o do broken-stick, com 3 (64,91%), é a alternativa compacta. Com o min-max, 7 componentes guardam muito mais variância do que o PCA do z-score guardava com 6 (66,84% na versão anterior), porque os gêneros raros, de pouca variância, quase não pesam.
 
 # %% [markdown]
 # ### 3.5 Dimensionalidade e concentração de distâncias
 #
-# Em alta dimensionalidade, as distâncias tendem a se concentrar: a menor e a maior ficam proporcionalmente próximas, o que prejudica métodos baseados em distância. Como P1 usará distâncias entre usuários, a célula mede a distribuição de pares de distância em uma amostra fixa de 2.000 usuários. As medidas usadas são:
+# Em alta dimensionalidade, as distâncias tendem a se concentrar: a menor e a maior ficam proporcionalmente próximas, o que prejudica métodos baseados em distância. Como P1 usará distâncias entre usuários, a célula mede a distribuição de pares de distância em uma amostra fixa de 2.000 usuários, na matriz min-max e no PCA com o d′ de cada critério de 3.4 (critérios que dão o mesmo d′ dividem o espaço). As medidas usadas são:
 #
 # - **Contraste relativo** = (máx − mín) / mín;
 # - **Variância relativa** = desvio-padrão / média das distâncias.
 #
-# Valores menores indicam mais concentração. As medidas são comparadas nos três espaços candidatos.
+# Valores menores indicam mais concentração.
 
 # %%
-# [3.5] Concentração de distâncias nos espaços candidatos
-from scipy.spatial.distance import pdist
-
+# [3.5] Concentração de distâncias: min-max e o PCA com o d′ de cada critério
 N_AMOSTRA_DIST = 2000
-idx_dist = perfil_pd.sample(n=N_AMOSTRA_DIST, random_state=42).index
-espacos = {
-    f"z-score ({X_p1_padronizado.shape[1]} atributos)": X_p1_padronizado,
-    f"min-max ({X_p1_minmax.shape[1]} atributos)": X_p1_minmax,
-    f"PCA ({X_p1_pca.shape[1]} componentes)": X_p1_pca,
-    f"PCA 80% ({X_p1_pca80.shape[1]} componentes)": X_p1_pca80,
-}
+idx_dist = perfil_pd.sample(n=N_AMOSTRA_DIST, random_state=42).index.to_numpy()
+
+
+def espacos_por_criterio(res, X_minmax):
+    """A matriz min-max e o PCA com o d′ de cada critério (critérios com o mesmo d′ dividem o espaço)."""
+    projecao = res["pca"].transform(X_minmax)
+    por_d = {}
+    for nome, v in res["criterios"].items():
+        por_d.setdefault(v, []).append(nome)
+    espacos = {f"min-max ({X_minmax.shape[1]} atributos)": np.asarray(X_minmax, dtype=float)}
+    for v in sorted(por_d):
+        espacos[f"PCA ({v}): " + "; ".join(por_d[v])] = projecao[:, :v]
+    return espacos
+
+
+espacos = espacos_por_criterio(res_base, X_p1_minmax)
 linhas_dist, distancias = [], {}
 for nome, X in espacos.items():
-    d = pdist(X.loc[idx_dist].to_numpy(), metric="euclidean")
+    d = pdist(X[idx_dist], metric="euclidean")
     d = d[d > 0]  # pares idênticos não entram no contraste relativo
     distancias[nome] = d
-    linhas_dist.append((nome, len(d), d.mean(), d.std(), d.min(), d.max(),
+    linhas_dist.append((nome, X.shape[1], len(d), d.mean(), d.std(), d.min(), d.max(),
                         (d.max() - d.min()) / d.min(), d.std() / d.mean()))
-tabela_dist = pd.DataFrame(linhas_dist, columns=["espaço", "pares", "média", "DP", "mín", "máx",
+tabela_dist = pd.DataFrame(linhas_dist, columns=["espaço", "dimensões", "pares", "média", "DP", "mín", "máx",
                                                  "contraste_relativo", "variancia_relativa"])
 print(f"Amostra fixa de {N_AMOSTRA_DIST:,} usuários (semente 42); distância euclidiana")
 print(tabela_dist.round(4).to_string(index=False))
 
-fig, ax = plt.subplots(figsize=(11, 4.5))
+fig, ax = plt.subplots(figsize=(12, 5))
+cores_pca = iter(["tab:green", "tab:red", "tab:purple", "tab:brown", "tab:pink", "tab:olive", "tab:cyan"])
 for nome, d in distancias.items():
-    ax.hist(d / d.mean(), bins=80, histtype="step", density=True, linewidth=1.4, label=nome)
-ax.set(title="Distribuição de pares de distância (normalizada pela média)",
+    ax.hist(d / d.mean(), bins=80, histtype="step", density=True, linewidth=1.5, label=nome,
+            color="tab:orange" if nome.startswith("min-max") else next(cores_pca))
+ax.set(title="Distribuição de pares de distância (normalizada pela média): min-max e PCA com o d′ de cada critério",
        xlabel="distância / média das distâncias", ylabel="densidade")
-ax.legend()
+ax.legend(fontsize=8)
 ax.grid(alpha=.2)
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# #### Dimensionalidade intrínseca
+# **Leitura dos resultados.**
 #
-# A dimensionalidade intrínseca estima quantas dimensões efetivas descrevem a estrutura dos dados, independentemente do número de atributos. O estimador de máxima verossimilhança de Levina–Bickel usa as distâncias aos k vizinhos mais próximos (k = 10 a 20) em uma amostra fixa. Valores bem menores que 22 indicam atributos correlacionados e reforçam a redução por PCA.
+# | Espaço | Dimensões | Contraste relativo | Variância relativa |
+# |---|---:|---:|---:|
+# | min-max | 19 | 23,10 | 0,3550 |
+# | PCA: broken-stick | 3 | 651,43 | 0,4750 |
+# | PCA: Kaiser-Guttman e ρ-score | 4 | 176,25 | 0,4358 |
+# | PCA: 80% da variância | 6 | 73,95 | 0,4065 |
+# | PCA: dimensão intrínseca D2 | 7 | 72,23 | 0,3905 |
+#
+# - **Ordem:** quanto menos componentes, menos concentradas as distâncias: a variância relativa sobe de 0,355 no min-max para 0,475 com 3 componentes. No gráfico, a curva do min-max (laranja) é a mais estreita em torno da média, e as curvas do PCA se alargam à medida que d′ diminui.
+# - **Contraste relativo:** depende só do par mais próximo e do mais distante. Com 3 componentes, o par mais próximo fica quase idêntico (distância 0,0026), e o contraste chega a 651; por isso a variância relativa, que usa todos os pares, é a medida principal.
+#
+# **Consequência:** cada critério troca nitidez das distâncias por informação. O PCA do broken-stick separa melhor perto de longe, mas descarta 35% da variância; o PCA principal (7 componentes) guarda 85,73% e concentra um pouco menos as distâncias que o min-max.
+
+# %% [markdown]
+# #### Dimensionalidade intrínseca global
+#
+# A dimensionalidade intrínseca estima quantas dimensões efetivas descrevem a estrutura dos dados, independentemente do número de atributos. Além da dimensão de correlação D2 e do ρ-score de 3.4, a célula usa o estimador de máxima verossimilhança de Levina–Bickel (MLE), que parte das distâncias aos k vizinhos mais próximos (k = 10 a 20). Os três são medidos na matriz min-max e em cada espaço PCA de 3.5, em amostras fixas. Num espaço PCA que guarda a estrutura, a dimensão intrínseca fica perto da do min-max; num espaço que corta estrutura, ela cai.
 
 # %%
-# [3.5-b] Dimensionalidade intrínseca estimada por máxima verossimilhança (Levina–Bickel)
+# [3.5-b] Dimensionalidade intrínseca global: D2, ρ-score e máxima verossimilhança (Levina–Bickel)
 from sklearn.neighbors import NearestNeighbors
+
 
 def dimensao_intrinseca_mle(X, k1=10, k2=20):
     distancias_viz, _ = NearestNeighbors(n_neighbors=k2 + 1).fit(X).kneighbors(X)
@@ -306,22 +494,113 @@ def dimensao_intrinseca_mle(X, k1=10, k2=20):
         estimativas.append(np.mean((k - 1) / np.maximum(soma_logs, 1e-12)))
     return float(np.mean(estimativas)), [float(e) for e in estimativas]
 
+
 N_AMOSTRA_ID = 10_000
-idx_id = perfil_pd.sample(n=N_AMOSTRA_ID, random_state=42).index
+idx_id = perfil_pd.sample(n=N_AMOSTRA_ID, random_state=42).index.to_numpy()
 linhas_id = []
-for nome, X in [(f"z-score ({X_p1_padronizado.shape[1]} atributos)", X_p1_padronizado),
-                 (f"PCA ({X_p1_pca.shape[1]} componentes)", X_p1_pca),
-                 (f"PCA 80% ({X_p1_pca80.shape[1]} componentes)", X_p1_pca80)]:
-    media_id, por_k = dimensao_intrinseca_mle(X.loc[idx_id].to_numpy())
-    linhas_id.append((nome, X.shape[1], media_id, min(por_k), max(por_k)))
-tabela_id = pd.DataFrame(linhas_id, columns=["espaço", "dimensões", "ID_MLE (média k=10..20)", "mín", "máx"])
-print(f"Amostra fixa de {N_AMOSTRA_ID:,} usuários (semente 42)")
+for nome, X in espacos.items():
+    media_id, por_k = dimensao_intrinseca_mle(X[idx_id])
+    linhas_id.append((nome, X.shape[1], dimensao_correlacao(X)[0], rho_score(X)[0], media_id, min(por_k), max(por_k)))
+tabela_id = pd.DataFrame(linhas_id, columns=["espaço", "dimensões", "D2", "ρ-score", "MLE (média k=10..20)",
+                                             "MLE mín", "MLE máx"])
+print(f"D2: amostra fixa de {N_AMOSTRA_D2:,} usuários; ρ-score: mediana de {len(SEMENTES_RHO)} amostras de "
+      f"{N_AMOSTRA_RHO:,}; MLE: amostra fixa de {N_AMOSTRA_ID:,} (semente 42)")
 print(tabela_id.round(2).to_string(index=False))
 
 # %% [markdown]
-# **Leitura dos resultados.** A dimensionalidade intrínseca estimada é de cerca de 13 no espaço padronizado de 21 atributos (12,7 a 14,1, conforme k) de cerca de 6 no espaço PCA de 6 componentes (6,4) e de cerca de 8 no PCA com 80% da variância, de 9 componentes (8,4). Os 21 atributos têm redundância, mas a estrutura dos dados não cabe em duas ou três dimensões.
+# **Leitura dos resultados.**
 #
-# **Consequência:** o PCA com 6 componentes (66,84% da variância) é uma redução útil para as distâncias, mas descarta parte da estrutura. O critério de 80% da variância (9 componentes, 80,07%) fica mais próximo da dimensionalidade intrínseca. Ele entra como alternativa ao lado do PCA com 6 componentes nas comparações de 3.5 a 3.9 e é testado em P1. Na concentração de distâncias (3.5), ele separa perto de longe um pouco menos que o PCA com 6 componentes (variância relativa de 0,417 contra 0,426; contraste relativo de 92,57 contra 110,66) e ainda mais que os espaços de 21 atributos.
+# - **Min-max (19 atributos):** D2 = 6,17, ρ-score = 3,95 e MLE = 11,94 (de 11,41 a 12,70, conforme k). Os três medem em escalas diferentes: o ρ-score usa a dispersão de todas as distâncias, D2 os raios pequenos e médios, e o MLE os 10 a 20 vizinhos mais próximos, onde a variação fina entre usuários acrescenta dimensões. Todos ficam bem abaixo dos 19 atributos.
+# - **Espaços PCA:** as estimativas caem com d′. No PCA principal (7), D2 = 4,89 e MLE = 7,23; no do broken-stick (3), D2 = 2,83 e MLE = 3,30. O PCA com 7 componentes guarda a maior parte da estrutura de escala média, mas a estrutura fina medida pelo MLE cai de 11,9 para 7,2: parte da variação local fica nos componentes descartados.
+#
+# **Consequência:** a dimensão intrínseca global confirma que os dados não cabem em 2 ou 3 dimensões. O PCA principal fica perto da dimensão de correlação do min-max (7 componentes para D2 = 6,17), como a regra pretendia.
+
+# %% [markdown]
+# #### Dimensionalidade intrínseca local: o público de cada gênero
+#
+# A dimensionalidade intrínseca global resume todos os usuários. A local pergunta se o público de um gênero precisa de mais ou menos componentes que o conjunto. O desenho evita três armadilhas:
+#
+# - **definição do público:** os 10% de usuários com maior proporção de avaliações no gênero. Assim, todo público tem o mesmo tamanho, e um usuário pode estar em mais de um. O gênero dominante não serve, porque deixa Drama com mais da metade dos usuários e gêneros pequenos com poucas dezenas;
+# - **tamanho e atividade:** as estimativas dependem do número de pontos e da atividade (quem avalia pouco tem proporções mais ruidosas). Cada estimativa usa 2.000 usuários do público, um quinto em cada quintil de atividade da população, repetida em 5 amostras;
+# - **efeito de qualquer seleção:** escolher os 10% mais altos num atributo já muda a dimensão. Duas referências medem isso: usuários sorteados entre todos e um placebo, os 10% de maior nota média, que não tem relação com gênero.
+#
+# A régua é a mesma para todos: a matriz min-max global de 3.3. Em cada amostra: D2, MLE, d′ = ⌈D2⌉ e a fração da variância no primeiro componente de um PCA feito dentro da amostra. **Regra fixada antes:** um gênero só precisa de outro número de componentes se a faixa do seu ⌈D2⌉ entre as amostras não se sobrepõe à dos usuários sorteados e a diferença de D2 para os sorteados passa da do placebo.
+
+# %%
+# [3.5-c] Dimensionalidade intrínseca local: o público de cada gênero, com amostras pareadas por atividade
+N_LOCAL, AMOSTRAS_LOCAL, TOPO = 2000, 5, 0.10
+X_local = X_p1_minmax.to_numpy()
+quintil_ativ = pd.qcut(np.log10(perfil_pd["n_avaliacoes"]), 5, labels=False, duplicates="drop").to_numpy()
+
+
+def amostra_pareada(membros, rng, n=N_LOCAL):
+    """n usuários do público, a mesma quantidade em cada quintil global de atividade."""
+    por_quintil = [membros[quintil_ativ[membros] == q] for q in np.unique(quintil_ativ)]
+    k = min(n // len(por_quintil), min(len(x) for x in por_quintil))
+    return np.concatenate([rng.choice(x, k, replace=False) for x in por_quintil])
+
+
+def medidas_locais(Z):
+    d2 = dimensao_correlacao(Z, n=len(Z))[0]
+    return d2, dimensao_intrinseca_mle(Z)[0], math.ceil(d2), 100 * PCA().fit(Z).explained_variance_ratio_[0]
+
+
+todos = np.arange(len(perfil_pd))
+publicos = {"usuários sorteados (referência)": todos}
+for g in lista_generos:
+    v = perfil_pd["prop_" + sufixo[g]].to_numpy()
+    publicos[g] = todos[(v >= np.quantile(v, 1 - TOPO)) & (v > 0)]
+v = perfil_pd["nota_media"].to_numpy()
+publicos["placebo: 10% de maior nota média"] = todos[v >= np.quantile(v, 1 - TOPO)]
+rng_local = np.random.default_rng(42)
+linhas_local = []
+for nome, membros in publicos.items():
+    amostras = [amostra_pareada(membros, rng_local) for _ in range(AMOSTRAS_LOCAL)]
+    m = np.array([medidas_locais(X_local[a]) for a in amostras])
+    linhas_local.append((nome, len(membros), len(amostras[0]), int(np.median(perfil_pd["n_avaliacoes"].to_numpy()[membros])),
+                         np.median(m[:, 0]), m[:, 0].min(), m[:, 0].max(), np.median(m[:, 1]),
+                         int(np.median(m[:, 2])), int(m[:, 2].min()), int(m[:, 2].max()), np.median(m[:, 3])))
+tabela_local = pd.DataFrame(linhas_local, columns=["público", "usuários", "por amostra", "mediana de avaliações",
+                                                   "D2", "D2 mín", "D2 máx", "MLE", "d′ = ⌈D2⌉", "d′ mín", "d′ máx",
+                                                   "% no 1º componente"])
+print(f"Público = 10% com maior proporção no gênero; {AMOSTRAS_LOCAL} amostras pareadas por atividade; "
+      "medianas entre as amostras; matriz min-max global")
+print(tabela_local.round(2).to_string(index=False))
+
+ref, placebo = tabela_local.iloc[0], tabela_local.iloc[-1]
+generos_local = tabela_local.iloc[1:-1]
+diferentes = generos_local[((generos_local["d′ mín"] > ref["d′ máx"]) | (generos_local["d′ máx"] < ref["d′ mín"]))
+                           & ((generos_local["D2"] - ref["D2"]).abs() > abs(placebo["D2"] - ref["D2"]))]
+print(f"\nReferência: d′ = {ref['d′ = ⌈D2⌉']} ({ref['d′ mín']} a {ref['d′ máx']}); D2 = {ref['D2']:.2f}. "
+      f"Efeito do placebo em D2: {placebo['D2'] - ref['D2']:+.2f}. "
+      f"D2 dos gêneros: de {generos_local['D2'].min():.2f} ({generos_local.loc[generos_local['D2'].idxmin(), 'público']}) "
+      f"a {generos_local['D2'].max():.2f} ({generos_local.loc[generos_local['D2'].idxmax(), 'público']}).")
+print("Gêneros que precisam de outro número de componentes, pela regra fixada:",
+      ", ".join(diferentes["público"]) if len(diferentes) else "nenhum")
+
+fig, ax = plt.subplots(figsize=(12, 6.5))
+ordem = tabela_local.sort_values("D2").reset_index(drop=True)
+for i, linha in ordem.iterrows():
+    cor = "gray" if linha["público"] == ref["público"] else ("#d18b24" if linha["público"] == placebo["público"] else "crimson")
+    ax.errorbar(linha["D2"], i, xerr=[[linha["D2"] - linha["D2 mín"]], [linha["D2 máx"] - linha["D2"]]], fmt="o", color=cor, capsize=3)
+    ax.text(linha["D2 máx"] + 0.03, i, f"d′ = {linha['d′ = ⌈D2⌉']}", va="center", fontsize=8)
+ax.axvspan(ref["D2 mín"], ref["D2 máx"], color="gray", alpha=.15, label="faixa dos usuários sorteados")
+ax.set_yticks(range(len(ordem)), ordem["público"])
+ax.set(title="Dimensão de correlação D2 no público de cada gênero (mediana e faixa entre as amostras)", xlabel="D2")
+ax.legend(fontsize=8)
+ax.grid(axis="x", alpha=.2)
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
+# **Leitura dos resultados.**
+#
+# - **Número de componentes:** o público de todos os 18 gêneros precisa de 7 componentes (d′ = ⌈D2⌉), como os usuários sorteados, nas 5 amostras de cada um. Western é o único com uma amostra em 6 (D2 de 5,92 a 6,03). Pela regra fixada, **nenhum gênero precisa de outro número de componentes**.
+# - **Tamanho das diferenças:** D2 vai de 5,97 (Western) a 6,57 (Mystery), contra 6,20 nos usuários sorteados; no gráfico, 17 dos 18 públicos ficam um pouco à direita da faixa dos sorteados, e só Western fica à esquerda. O placebo, os 10% de maior nota média, muda D2 em −0,36. As diferenças entre gêneros (de −0,23 a +0,37) têm o mesmo tamanho do efeito de selecionar 10% dos usuários por qualquer atributo.
+# - **O que muda de um gênero para outro é a forma:** a fração da variância no primeiro componente vai de 27,0% (Mystery), 27,4% (Sci-Fi) e 27,6% (Romance) a 35,0% (War), 35,7% (Drama) e 37,5% (Adventure), contra 34,0% nos sorteados. No público de Adventure, Drama e War, um eixo só concentra mais a variação; no de Mystery, Sci-Fi e Romance, ela se espalha por mais direções.
+# - **Atividade:** a mediana de avaliações vai de 38 (Thriller) a 79 (Horror). O pareamento por quintil de atividade evita que essa diferença apareça como diferença de dimensão.
+#
+# **Consequência:** para o número de componentes, a análise local confirma o d′ = 7 global: não é preciso um d′ por gênero. A caracterização de cada gênero vem da forma (o peso do primeiro eixo) e, depois de P1, dos grupos. A versão "depois do agrupamento", com a dimensão dentro de cada grupo de P1 comparada com subconjuntos sorteados do mesmo tamanho, entra na validação de P1.
 
 # %% [markdown]
 # ### 3.6 Visualização do espaço transformado
@@ -330,8 +609,8 @@ print(tabela_id.round(2).to_string(index=False))
 #
 # - **PCA:** os dois primeiros componentes;
 # - **MDS:** preserva as distâncias entre pares, calculado em 500 usuários por custo computacional;
-# - **t-SNE:** preserva vizinhanças locais, aplicado sobre o espaço PCA;
-# - **coordenadas paralelas:** os 21 atributos padronizados.
+# - **t-SNE:** preserva vizinhanças locais, aplicado sobre o PCA principal e sobre a alternativa do broken-stick;
+# - **coordenadas paralelas:** os atributos do vetor base em min-max, em 100 usuários, para que as linhas possam ser seguidas.
 #
 # Antes de P1 não há grupos. Por isso, a cor indica o grupo da nota média do usuário, só como referência visual.
 
@@ -343,16 +622,17 @@ idx_vis = perfil_pd.sample(n=3000, random_state=7).index
 grupo_media_vis = np.ceil(perfil_pd.loc[idx_vis, "nota_media"]).clip(1, 5).astype(int).to_numpy()
 pca_2d = X_p1_pca.loc[idx_vis, ["CP1", "CP2"]].to_numpy()
 tsne_2d = TSNE(n_components=2, perplexity=30, init="pca", random_state=42).fit_transform(X_p1_pca.loc[idx_vis].to_numpy())
-tsne_2d_80 = TSNE(n_components=2, perplexity=30, init="pca", random_state=42).fit_transform(X_p1_pca80.loc[idx_vis].to_numpy())
+tsne_2d_bs = TSNE(n_components=2, perplexity=30, init="pca" if X_p1_pca_bs.shape[1] >= 2 else "random",  # PCA exige 2+ eixos
+                  random_state=42).fit_transform(X_p1_pca_bs.loc[idx_vis].to_numpy())
 idx_mds = idx_vis[:500]
-mds_2d = MDS(n_components=2, n_init=1, max_iter=300, random_state=42).fit_transform(X_p1_padronizado.loc[idx_mds].to_numpy())
+mds_2d = MDS(n_components=2, n_init=1, max_iter=300, random_state=42).fit_transform(X_p1_minmax.loc[idx_mds].to_numpy())
 
 fig, axes = plt.subplots(1, 4, figsize=(26, 6))
 projecoes = [
     (axes[0], pca_2d, grupo_media_vis, f"PCA: CP1 × CP2 ({len(idx_vis):,} usuários)"),
-    (axes[1], mds_2d, grupo_media_vis[:len(idx_mds)], f"MDS: {X_p1_padronizado.shape[1]} atributos z ({len(idx_mds)} usuários)"),
-    (axes[2], tsne_2d, grupo_media_vis, f"t-SNE: PCA com {X_p1_pca.shape[1]} componentes"),
-    (axes[3], tsne_2d_80, grupo_media_vis, f"t-SNE: PCA 80% ({X_p1_pca80.shape[1]} componentes)"),
+    (axes[1], mds_2d, grupo_media_vis[:len(idx_mds)], f"MDS: {X_p1_minmax.shape[1]} atributos min-max ({len(idx_mds)} usuários)"),
+    (axes[2], tsne_2d, grupo_media_vis, f"t-SNE: PCA com {X_p1_pca.shape[1]} componentes (D2)"),
+    (axes[3], tsne_2d_bs, grupo_media_vis, f"t-SNE: PCA com {X_p1_pca_bs.shape[1]} componentes (broken-stick)"),
 ]
 for ax, coords, cor, titulo in projecoes:
     pontos = ax.scatter(coords[:, 0], coords[:, 1], c=cor, cmap="viridis", s=6, alpha=.6, vmin=1, vmax=5)
@@ -362,24 +642,25 @@ for ax, coords, cor, titulo in projecoes:
 fig.colorbar(pontos, ax=axes, shrink=.8, label="Grupo da nota média do usuário (1 a 5)")
 plt.show()
 
-# Coordenadas paralelas: 300 usuários, 21 atributos padronizados (limitados a [−3, 3] apenas no gráfico).
-paralelas = X_p1_padronizado.loc[idx_vis[:300]].clip(-3, 3).copy()
-paralelas["grupo_nota_media"] = grupo_media_vis[:300].astype(str)
+# Coordenadas paralelas: 100 usuários da mesma amostra, atributos do vetor base em min-max ([0, 1]).
+N_PARALELAS = 100
+paralelas = X_p1_minmax.loc[idx_vis[:N_PARALELAS]].copy()
+paralelas["grupo_nota_media"] = grupo_media_vis[:N_PARALELAS].astype(str)
 fig, ax = plt.subplots(figsize=(20, 6))
 pd.plotting.parallel_coordinates(paralelas.sort_values("grupo_nota_media"), "grupo_nota_media", ax=ax,
-                                 colormap="viridis", alpha=.35, linewidth=.8)
-ax.set_title("Coordenadas paralelas dos atributos padronizados (300 usuários; cor = grupo da nota média)")
+                                 colormap="viridis", alpha=.5, linewidth=.9)
+ax.set_title(f"Coordenadas paralelas dos atributos em min-max ({N_PARALELAS} usuários; cor = grupo da nota média)")
 ax.tick_params(axis="x", rotation=60)
-ax.set_ylabel("valor z (limitado a [−3, 3])")
+ax.set_ylabel("valor min-max (0 a 1)")
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Projeções 2D:** PCA, MDS e t-SNE mostram uma nuvem contínua de usuários, sem grupos isolados. O t-SNE sobre o PCA com 9 componentes mostra o mesmo quadro: uma nuvem contínua, com poucos aglomerados pequenos na borda.
-# - **Nota média:** a cor não organiza a estrutura principal. Usuários com médias diferentes aparecem misturados, com poucas regiões locais de médias mais baixas ou mais altas no t-SNE.
-# - **Coordenadas paralelas:** a variação entre usuários está sobretudo nas proporções de gênero.
+# - **Projeções 2D:** PCA, MDS e t-SNE mostram uma nuvem contínua de usuários, sem grupos isolados. O t-SNE sobre o PCA do broken-stick (3 componentes) forma filamentos dentro da nuvem, efeito comum do t-SNE em poucas dimensões, mas também sem grupos separados.
+# - **Nota média:** a cor não organiza a estrutura principal. Nos dois t-SNE, as médias mais altas (amarelo) ficam mais na borda, e há manchas locais de médias perto de 3 no interior.
+# - **Coordenadas paralelas (100 usuários, min-max):** as linhas se separam sobretudo na nota média e nas proporções de Comedy, Drama e Thriller; nos gêneros raros (Documentary, Film-Noir, Western), quase todas ficam perto de 0. Os usuários de média alta (amarelo) começam no alto do primeiro eixo, mas se misturam aos demais nos eixos de gênero.
 #
 # **Consequência:** espera-se que um agrupamento produza regiões de um contínuo, definidas principalmente pela composição de gêneros, e não grupos naturalmente separados.
 
@@ -391,7 +672,7 @@ plt.show()
 # **Valores atípicos.** O k-means e outros métodos baseados em médias são sensíveis a objetos muito afastados, que deslocam os centróides. Atípicos podem ser objetos legítimos, e não erros: aqui seriam usuários com gosto muito concentrado em poucos gêneros. Três critérios são calculados:
 #
 # - **(a) univariado:** |z| > 3 em cada atributo padronizado;
-# - **(b) multivariado:** distância de Mahalanobis ao centro no espaço PCA, comparada ao quantil 0,999 da χ² com 7 graus de liberdade (referência sob normalidade multivariada);
+# - **(b) multivariado:** distância de Mahalanobis ao centro no espaço PCA principal, comparada ao quantil 0,999 da χ² com d′ graus de liberdade (referência sob normalidade multivariada);
 # - **(c) vizinhança:** distância ao 10º vizinho mais próximo acima do percentil 99.
 #
 # Um usuário é marcado como atípico quando está longe do centro (b) **e** isolado dos vizinhos (c). Quem está longe do centro, mas tem vizinhos próximos, pode formar um grupo de nicho e não é marcado. Nenhum usuário é removido: a marcação `atipico` permite comparar P1 com e sem esses usuários.
@@ -475,16 +756,17 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **(a) |z| > 3:** 31.263 usuários (19,23%) passam do limite em pelo menos um atributo. Nos dez atributos com mais casos, a fração vai de 1,30% a 2,07% (IMAX, Animation, Children, Sci-Fi e Horror lideram), bem acima dos 0,27% esperados numa normal. As proporções de gêneros raros são muito assimétricas: 12,0 em Documentary e 9,6 em Film-Noir. Com caudas tão longas, a regra univariada marca a cauda de cada atributo, não casos isolados, e não serve sozinha como critério.
-# - **(b) Mahalanobis:** 3.563 usuários (2,19%) passam do quantil 0,999 da χ² com 6 graus de liberdade, cerca de 22 vezes os 163 esperados sob normalidade. A nuvem de usuários tem caudas mais pesadas que uma normal multivariada.
-# - **(c) Vizinhança:** o limite do percentil 99 (2,00) é 2,8 vezes a mediana da distância ao 10º vizinho (0,709).
-# - **Atípicos marcados:** 1.293 usuários (0,80%) estão longe do centro e isolados ao mesmo tempo. Outros 2.270 estão longe do centro, mas têm vizinhos próximos (possíveis nichos), e só 333 estão isolados perto do centro.
-# - **Quem são:** em quase todos, o atributo mais extremo é um gênero raro: Documentary (222 usuários), Film-Noir (215), Western (183) e War (118). Eles avaliam menos filmes (mediana de 35 contra 71) e dão notas um pouco mais altas (mediana da média 3,88 contra 3,70). Com poucas avaliações, poucos filmes de um gênero raro bastam para gerar uma proporção extrema.
-# - **Gráfico:** no plano CP1 × CP2 os atípicos se espalham pela borda, mas também se sobrepõem ao centro, porque se afastam sobretudo nos componentes 4 a 6, que carregam Mystery, Western, Film-Noir, War e Documentary.
+# - **(a) |z| > 3:** 28.962 usuários (17,82%) passam do limite em pelo menos um atributo. Nos dez atributos com mais casos, a fração vai de 1,19% a 1,86% (Animation, Sci-Fi, Horror, Musical e Fantasy lideram), bem acima dos 0,27% esperados numa normal. As proporções de gêneros raros são muito assimétricas: 12,0 em Documentary e 9,6 em Film-Noir. Com caudas tão longas, a regra univariada marca a cauda de cada atributo, não casos isolados, e não serve sozinha como critério.
+# - **(b) Mahalanobis:** no PCA principal (7 componentes), 3.899 usuários (2,40%) passam do quantil 0,999 da χ² com 7 graus de liberdade (24,32), cerca de 24 vezes os 163 esperados sob normalidade. A nuvem de usuários tem caudas mais pesadas que uma normal multivariada.
+# - **(c) Vizinhança:** o limite do percentil 99 (0,211) é 2,4 vezes a mediana da distância ao 10º vizinho (0,088).
+# - **Atípicos marcados:** 1.156 usuários (0,71%) estão longe do centro e isolados ao mesmo tempo. Outros 2.743 estão longe do centro, mas têm vizinhos próximos (possíveis nichos), e só 470 estão isolados perto do centro.
+# - **Quem são:** o atributo mais extremo é, em geral, um gênero de frequência média ou a nota: Horror (214 usuários), Animation (150), desvio-padrão da nota (145), Sci-Fi (125) e nota média (85). Eles avaliam menos filmes (mediana de 30 contra 71) e dão notas um pouco mais altas (mediana da média 3,78 contra 3,70). Com poucas avaliações, poucos filmes de um gênero bastam para gerar uma proporção extrema.
+# - **Mudança em relação ao z-score:** antes, os gêneros raros dominavam os atípicos (Documentary, Film-Noir, Western e War), porque o z-score os ampliava. No min-max, esses gêneros quase não pesam, e os atípicos passam a ser os usuários extremos em gêneros de peso médio e na forma de dar notas.
+# - **Gráfico:** no plano CP1 × CP2 os atípicos se espalham pela borda, mas também se sobrepõem ao centro, porque se afastam também nos componentes 3 a 7, que carregam a nota, Horror, Sci-Fi e Animation.
 #
 # **Limitação:** os limiares (quantil 0,999 e percentil 99) são escolhas registradas, e a referência χ² supõe normalidade, que os dados não seguem.
 #
-# **Consequência:** os 1.293 usuários são mantidos e ficam marcados em `perfil_pd["atipico"]`, para que P1 seja executado com e sem eles. Com a exclusão dos filmes sem gênero (2.2-d), `Unknown` já não existe; os valores extremos vêm agora dos gêneros raros de verdade, que o vetor revisado (3.8) agrupa.
+# **Consequência:** os 1.156 usuários são mantidos e ficam marcados em `perfil_pd["atipico"]`, para que P1 seja executado com e sem eles.
 
 # %% [markdown]
 # #### Tendência de agrupamento
@@ -495,7 +777,7 @@ plt.show()
 # - **w:** distância de um usuário real sorteado ao seu vizinho real mais próximo;
 # - **H = Σu / (Σu + Σw):** H ≈ 0,5 indica dados indistinguíveis de pontos uniformes; H próximo de 1 indica dados concentrados em regiões.
 #
-# O cálculo usa 1.000 pontos por repetição e 10 repetições, nos dois espaços candidatos, com e sem os atípicos. Como os valores extremos alargam o domínio mín–máx e inflam H, o domínio dos percentis 1–99 é usado como versão robusta. Um controle com dados uniformes de mesmo tamanho deve dar H ≈ 0,5.
+# O cálculo usa 1.000 pontos por repetição e 10 repetições, no PCA principal, na matriz min-max e no PCA do broken-stick, com e sem os atípicos. Como os valores extremos alargam o domínio mín–máx e inflam H, o domínio dos percentis 1–99 é usado como versão robusta. Um controle com dados uniformes de mesmo tamanho deve dar H ≈ 0,5.
 #
 # **Limite da medida:** H mede concentração, não separação. Um único aglomerado denso também dá H alto. A separação entre grupos só pode ser avaliada em P1.
 
@@ -528,15 +810,15 @@ def hopkins(X, dominio="min-max", m=M_HOPKINS, repeticoes=REPETICOES_HOPKINS, se
 
 
 sem_atipicos = ~perfil_pd["atipico"].to_numpy()
-ROTULO_PCA, ROTULO_Z = f"PCA ({X_p1_pca.shape[1]})", f"z-score ({X_p1_padronizado.shape[1]})"
-ROTULO_PCA80 = f"PCA 80% ({X_p1_pca80.shape[1]})"
+ROTULO_PCA, ROTULO_MM = f"PCA ({X_p1_pca.shape[1]})", f"min-max ({X_p1_minmax.shape[1]})"
+ROTULO_BS = f"PCA broken-stick ({X_p1_pca_bs.shape[1]})"
 cenarios_hopkins = [
     (ROTULO_PCA, "todos", X_p1_pca.to_numpy()),
     (ROTULO_PCA, "sem atípicos", X_p1_pca.to_numpy()[sem_atipicos]),
-    (ROTULO_Z, "todos", X_p1_padronizado.to_numpy()),
-    (ROTULO_Z, "sem atípicos", X_p1_padronizado.to_numpy()[sem_atipicos]),
-    (ROTULO_PCA80, "todos", X_p1_pca80.to_numpy()),
-    (ROTULO_PCA80, "sem atípicos", X_p1_pca80.to_numpy()[sem_atipicos]),
+    (ROTULO_MM, "todos", X_p1_minmax.to_numpy()),
+    (ROTULO_MM, "sem atípicos", X_p1_minmax.to_numpy()[sem_atipicos]),
+    (ROTULO_BS, "todos", X_p1_pca_bs.to_numpy()),
+    (ROTULO_BS, "sem atípicos", X_p1_pca_bs.to_numpy()[sem_atipicos]),
 ]
 linhas_hopkins = []
 for espaco, populacao, X in cenarios_hopkins:
@@ -547,7 +829,7 @@ for espaco, populacao, X in cenarios_hopkins:
             u_vis, w_vis = u, w
 
 # Controle: dados uniformes com o mesmo tamanho, no domínio dos percentis 1–99 de cada espaço.
-for espaco, X in [(ROTULO_PCA, X_p1_pca.to_numpy()), (ROTULO_Z, X_p1_padronizado.to_numpy()), (ROTULO_PCA80, X_p1_pca80.to_numpy())]:
+for espaco, X in [(ROTULO_PCA, X_p1_pca.to_numpy()), (ROTULO_MM, X_p1_minmax.to_numpy()), (ROTULO_BS, X_p1_pca_bs.to_numpy())]:
     X_uniforme = np.random.default_rng(0).uniform(np.percentile(X, 1, axis=0), np.percentile(X, 99, axis=0), size=X.shape)
     h_medio, h_dp, _, _ = hopkins(X_uniforme, "min-max")
     linhas_hopkins.append((espaco, "controle: dados uniformes", "min-max", len(X_uniforme), h_medio, h_dp))
@@ -563,7 +845,7 @@ log_w, log_u = np.log10(np.maximum(w_vis, 1e-3)), np.log10(np.maximum(u_vis, 1e-
 bins = np.linspace(min(log_w.min(), log_u.min()), max(log_w.max(), log_u.max()), 50)
 ax.hist(log_w, bins=bins, alpha=.6, color="#4682a9", label="usuário real → vizinho real mais próximo (w)")
 ax.hist(log_u, bins=bins, alpha=.6, color="#e08a3c", label="ponto uniforme → usuário real mais próximo (u)")
-ax.set(title=f"Distância ao vizinho mais próximo no espaço PCA: usuários × pontos uniformes (m = {M_HOPKINS:,})",
+ax.set(title=f"Distância ao vizinho mais próximo no PCA principal: usuários × pontos uniformes (m = {M_HOPKINS:,})",
        xlabel="log10(distância)", ylabel="pontos")
 ax.legend()
 plt.tight_layout()
@@ -573,11 +855,11 @@ plt.show()
 # **Leitura dos resultados.**
 #
 # - **Controle:** com dados uniformes, H = 0,500 nos três espaços, o que confirma o cálculo.
-# - **Domínio mín–máx:** H = 0,960 no PCA e 0,953 no z-score. Esses valores são inflados pelos extremos, que alargam o domínio dos pontos uniformes: sem os 1.293 atípicos, caem para 0,930 e 0,932.
-# - **Domínio robusto (percentis 1–99):** H = 0,705 no PCA com 6 componentes, 0,718 no PCA com 9 e 0,767 no z-score; sem os atípicos, 0,696, 0,709 e 0,762. O desvio-padrão entre repetições é no máximo 0,0040.
+# - **Domínio mín–máx:** H = 0,895 no PCA principal (7), 0,926 no min-max (19) e 0,946 no PCA do broken-stick (3). Esses valores são inflados pelos extremos, que alargam o domínio dos pontos uniformes: sem os 1.156 atípicos, caem para 0,881, 0,925 e 0,936.
+# - **Domínio robusto (percentis 1–99):** H = 0,678 no PCA principal, 0,752 no min-max e 0,654 no PCA do broken-stick; sem os atípicos, 0,674, 0,748 e 0,654. O desvio-padrão entre repetições é no máximo 0,012.
 # - **Distâncias:** no histograma, a distância de um usuário ao vizinho real mais próximo (w) fica, em geral, abaixo da distância de um ponto uniforme ao usuário mais próximo (u), mas as duas distribuições se sobrepõem em parte.
 #
-# **Interpretação:** os usuários estão mais concentrados do que pontos uniformes, e isso não é efeito dos atípicos, porque retirá-los quase não muda o H robusto. Mas a tendência é moderada: uma referência usual é H > 0,75 para tendência clara, e o espaço PCA fica abaixo dela. Junto com as projeções de 3.6, o quadro é de um núcleo denso com caudas, e não de grupos naturalmente separados.
+# **Interpretação:** os usuários estão mais concentrados do que pontos uniformes, e isso não é efeito dos atípicos, porque retirá-los quase não muda o H robusto. Mas a tendência é moderada: uma referência usual é H > 0,75 para tendência clara; o min-max fica no limite, e os espaços PCA ficam abaixo dela. Junto com as projeções de 3.6, o quadro é de um núcleo denso com caudas, e não de grupos naturalmente separados.
 #
 # **Consequência:** vale agrupar, porque os dados não são uniformes, mas deve-se esperar separação fraca entre grupos. A validação de P1 precisa comparar os índices com os de partições de dados uniformes no mesmo domínio.
 
@@ -592,10 +874,11 @@ plt.show()
 #
 # O vetor revisado mantém a lógica de proporções com denominador explícito e acrescenta:
 #
-# - **grupos do perfil:** o IMAX sai, porque é formato de exibição, e não gênero (quase todo filme IMAX tem outro gênero); Animation e Children formam um grupo só, `Animation/Children`, porque têm o mesmo público em grande parte. Os rótulos dos dados não mudam: a junção vale só neste vetor;
+# - **grupos do perfil:** Animation e Children formam um grupo só, `Animation/Children`, porque têm o mesmo público em grande parte. Os rótulos dos dados não mudam: a junção vale só neste vetor. O IMAX já saiu na limpeza (2.2), por ser formato de exibição;
 # - **proporção fracionária:** cada avaliação distribui peso 1/k entre os k grupos do filme, e o vetor de gêneros soma 1;
 # - **limite de gêneros:** grupos com menos de 2% das avaliações formam o grupo `raros`;
 # - **atributos derivados:** viés do usuário (nota menos a média do filme), atividade em escala log, popularidade média e ano médio dos filmes avaliados, e diversidade de gêneros (entropia normalizada);
+# - **desvio-padrão da nota em cada grupo, na forma relativa:** quanto o usuário varia mais ou menos as notas naquele grupo do que no geral, `dprel_<grupo>` = n / (n + 5) · (desvio no grupo − desvio geral), com n as avaliações do usuário no grupo, e 0 com menos de 2 avaliações. O fator n / (n + 5) puxa para 0 quem tem poucas avaliações no grupo, porque um desvio calculado com 2 ou 3 notas é instável. A forma relativa evita repetir o desvio geral: o desvio bruto por gênero, completado com o desvio geral onde falta, fica muito correlacionado com `nota_dp`. Os grupos são os 12 mantidos e `raros`, que têm mais avaliações por usuário que os gêneros isolados;
 # - **gênero dominante:** atributo categórico, usado só para descrever.
 #
 # A seleção por filtro usa o mesmo limiar de 3.2: em cada par redundante, sai o atributo com maior |Pearson| médio com os demais.
@@ -617,8 +900,8 @@ derivados_pd = (ratings_clean.select("userId", "movieId", "rating")
         F.avg("log_n_filme").alias("popularidade_media"),
         F.avg("ano_lancamento").alias("ano_medio_lancamento"))
     .toPandas())
-# Grupos do perfil (decisão D5): IMAX é formato de exibição, não gênero, e sai; Animation e Children viram um grupo só.
-GRUPO_DO_GENERO = {"IMAX": None, "Animation": "Animation/Children", "Children": "Animation/Children"}
+# Grupos do perfil: Animation e Children viram um grupo só (o IMAX já saiu na 2.2).
+GRUPO_DO_GENERO = {"Animation": "Animation/Children", "Children": "Animation/Children"}
 grupo_do = lambda g: GRUPO_DO_GENERO.get(g, g)
 grupos_perfil = sorted({grupo_do(g) for g in lista_generos} - {None})
 coluna_grupo = {gr: "frac_" + gr.lower().replace("-", "_").replace("/", "_") for gr in grupos_perfil}
@@ -626,12 +909,9 @@ mapa_grupo = spark.createDataFrame([(g, grupo_do(g)) for g in lista_generos if g
 filme_grupo = movie_genres.select("movieId", "genre").join(F.broadcast(mapa_grupo), "genre").select("movieId", "grupo").distinct()
 grupos_por_filme = filme_grupo.groupBy("movieId").agg(F.count("*").alias("n_grupos_filme"))
 filme_grupo = filme_grupo.join(grupos_por_filme, "movieId").cache()
-so_imax = movies_clean.join(grupos_por_filme, "movieId", "left_anti").select("movieId")
-n_so_imax = so_imax.count()
-aval_so_imax = ratings_clean.join(F.broadcast(so_imax), "movieId").count()
-assert len(grupos_perfil) == len(lista_generos) - 2 and not any("/" in c for c in coluna_grupo.values())
-print(f"Grupos do perfil: {len(grupos_perfil)} (os {len(lista_generos)} gêneros, sem IMAX, com Animation e Children juntos)")
-print(f"Filmes que só têm IMAX: {n_so_imax}, com {aval_so_imax:,} avaliações; essas avaliações não entram nas proporções de gênero")
+assert movies_clean.join(grupos_por_filme, "movieId", "left_anti").limit(1).count() == 0  # todo filme tem um grupo
+assert len(grupos_perfil) == len(lista_generos) - 1 and not any("/" in c for c in coluna_grupo.values())
+print(f"Grupos do perfil: {len(grupos_perfil)} (os {len(lista_generos)} gêneros, com Animation e Children juntos)")
 
 
 def pesos_do_filme(generos):
@@ -640,8 +920,7 @@ def pesos_do_filme(generos):
     return {gr: 1 / len(grupos) for gr in grupos}
 
 
-assert pesos_do_filme("Action|IMAX") == {"Action": 1.0}
-assert pesos_do_filme("IMAX") == {}
+assert pesos_do_filme("Action|Adventure") == {"Action": 0.5, "Adventure": 0.5}
 assert pesos_do_filme("Animation|Children|Comedy") == {"Animation/Children": 0.5, "Comedy": 0.5}
 assert pesos_do_filme("Animation") == {"Animation/Children": 1.0}
 
@@ -654,12 +933,11 @@ print(f"Avaliações de Animation em filmes também Children: {100 * flags.loc[t
       f"de Children em filmes também Animation: {100 * flags.loc[tem_a & tem_c, 'n_filme'].sum() / flags.loc[tem_c, 'n_filme'].sum():.1f}%; "
       f"Jaccard nos filmes: {(tem_a & tem_c).sum() / (tem_a | tem_c).sum():.3f}")
 
-# Exemplo calculado: um filme com Animation e Children e um com IMAX (Toy Story e Avatar, se estiverem no catálogo).
+# Exemplo calculado: um filme com Animation e Children (Toy Story, se estiver no catálogo).
 catalogo_ex = (movies_clean.select("movieId", "title", "genres").join(filmes_info.select("movieId", "n_filme"), "movieId")
                .orderBy(F.desc("n_filme"), "movieId").toPandas())
 exemplos = []
-for titulo, condicao in [("Toy Story (1995)", lambda s: "Animation" in s and "Children" in s),
-                         ("Avatar (2009)", lambda s: "IMAX" in s and "|" in s)]:
+for titulo, condicao in [("Toy Story (1995)", lambda s: "Animation" in s and "Children" in s)]:
     achados = catalogo_ex[catalogo_ex["title"] == titulo]
     exemplos.append(achados.iloc[0] if len(achados) else catalogo_ex[catalogo_ex["genres"].map(condicao)].iloc[0])
 pesos_spark = filme_grupo.filter(F.col("movieId").isin([int(e["movieId"]) for e in exemplos])).toPandas()
@@ -669,8 +947,8 @@ for e in exemplos:
     v8 = pesos_do_filme(e["genres"])
     no_spark = pesos_spark[pesos_spark["movieId"] == e["movieId"]]
     assert set(no_spark["grupo"]) == set(v8) and np.allclose(1 / no_spark["n_grupos_filme"], 1 / len(v8))
-    print(f"  {e['title']} ({e['genres']}): v7, por gênero: 1/{len(generos)} para cada um; "
-          f"v8, por grupo: " + ", ".join(f"{gr} 1/{len(v8)}" for gr in v8))
+    print(f"  {e['title']} ({e['genres']}): por gênero, 1/{len(generos)} para cada um; "
+          f"por grupo, " + ", ".join(f"{gr} 1/{len(v8)}" for gr in v8))
 
 # Proporção fracionária: cada avaliação distribui peso 1/k entre os k grupos do filme; o vetor de gêneros soma 1.
 frac_pd = (ratings_clean.select("userId", "movieId")
@@ -680,12 +958,12 @@ frac_pd = (ratings_clean.select("userId", "movieId")
     .rename(columns=coluna_grupo))
 cols_frac = [coluna_grupo[gr] for gr in grupos_perfil]
 massa_genero = frac_pd[cols_frac].sum() / frac_pd[cols_frac].sum().sum()  # participação de cada grupo nas avaliações
-perfil_rev_pd = (perfil_pd[["userId", "n_avaliacoes", "nota_media", "nota_dp", "atipico"]]
+perfil_rev_pd = (perfil_pd[["userId", "n_avaliacoes", "nota_media", "nota_dp", "atipico"]].reset_index(drop=True)
                  .merge(derivados_pd, on="userId", how="left").merge(frac_pd, on="userId", how="left"))
 assert len(perfil_rev_pd) == len(perfil_pd)
 assert (perfil_rev_pd["userId"].to_numpy() == perfil_pd["userId"].to_numpy()).all()
 perfil_rev_pd.index = perfil_pd.index
-peso_total = perfil_rev_pd[cols_frac].sum(axis=1)  # = avaliações do usuário menos as de filmes que só têm IMAX
+peso_total = perfil_rev_pd[cols_frac].sum(axis=1)  # = avaliações do usuário (todo filme tem pelo menos um grupo)
 assert (peso_total > 0).all()
 perfil_rev_pd[cols_frac] = perfil_rev_pd[cols_frac].div(peso_total, axis=0)
 assert np.allclose(perfil_rev_pd[cols_frac].sum(axis=1), 1.0, atol=1e-9)
@@ -710,6 +988,40 @@ generos_mantidos = [gr for gr in grupos_perfil if destino[gr] == "mantido"]
 generos_raros = [gr for gr in grupos_perfil if destino[gr] == "agrupado em raros"]
 perfil_rev_pd["frac_raros"] = perfil_rev_pd[[coluna_grupo[gr] for gr in generos_raros]].sum(axis=1)
 
+# Desvio-padrão relativo por grupo (12 mantidos e raros): n/(n + M) · (desvio no grupo − desvio geral); 0 com n < 2.
+# Uma avaliação conta no grupo se o filme tem algum gênero dele (contagem inteira, sem a fração 1/k).
+M_ENCOLHIMENTO = 5
+grupos_dp = generos_mantidos + ["raros"]
+coluna_dprel = {gr: "dprel_" + ("raros" if gr == "raros" else coluna_grupo[gr][len("frac_"):]) for gr in grupos_dp}
+cols_dprel = [coluna_dprel[gr] for gr in grupos_dp]
+mapa_final = spark.createDataFrame([(gr, gr if destino[gr] == "mantido" else "raros") for gr in grupos_perfil],
+                                   ["grupo", "grupo_final"])
+filme_grupo_final = filme_grupo.join(F.broadcast(mapa_final), "grupo").select("movieId", "grupo_final").distinct()
+dp_grupo_pd = (ratings_clean.select("userId", "movieId", "rating")
+    .join(F.broadcast(filme_grupo_final), "movieId")
+    .groupBy("userId", "grupo_final").agg(F.count("*").alias("n"), F.stddev("rating").alias("dp_grupo"))
+    .toPandas()
+    .merge(perfil_pd[["userId", "nota_dp"]], on="userId"))
+dp_grupo_pd["dprel"] = np.where(dp_grupo_pd["n"] >= 2, dp_grupo_pd["n"] / (dp_grupo_pd["n"] + M_ENCOLHIMENTO)
+                                * (dp_grupo_pd["dp_grupo"] - dp_grupo_pd["nota_dp"]), 0.0)
+dprel_pd = (dp_grupo_pd.pivot(index="userId", columns="grupo_final", values="dprel")
+            .reindex(index=perfil_rev_pd["userId"], columns=grupos_dp).fillna(0.0).rename(columns=coluna_dprel))
+perfil_rev_pd = perfil_rev_pd.join(pd.DataFrame(dprel_pd.to_numpy(), columns=cols_dprel, index=perfil_rev_pd.index))
+# Conferência num caso: Drama do primeiro usuário, recalculado das notas dele.
+u0 = int(perfil_rev_pd["userId"].iloc[0])
+notas_u0 = np.array([r["rating"] for r in ratings_clean.filter(F.col("userId") == u0)
+                     .join(filme_grupo_final.filter(F.col("grupo_final") == "Drama"), "movieId").select("rating").collect()])
+if "Drama" in grupos_dp and len(notas_u0) >= 2:
+    esperado = len(notas_u0) / (len(notas_u0) + M_ENCOLHIMENTO) * (notas_u0.std(ddof=1) - perfil_rev_pd["nota_dp"].iloc[0])
+    assert np.isclose(perfil_rev_pd["dprel_drama"].iloc[0], esperado)
+    print(f"\nConferência do desvio relativo: usuário {u0}, Drama: n = {len(notas_u0)}, desvio no grupo "
+          f"{notas_u0.std(ddof=1):.4f}, desvio geral {perfil_rev_pd['nota_dp'].iloc[0]:.4f} → "
+          f"{len(notas_u0)}/({len(notas_u0)} + {M_ENCOLHIMENTO}) × ({notas_u0.std(ddof=1):.4f} − "
+          f"{perfil_rev_pd['nota_dp'].iloc[0]:.4f}) = {esperado:.4f}")
+print("Usuários com 2 ou mais avaliações em cada grupo (%):",
+      {gr: round(100 * (dp_grupo_pd.loc[dp_grupo_pd["grupo_final"] == gr, "n"] >= 2).sum() / len(perfil_rev_pd), 1)
+       for gr in grupos_dp})
+
 # Atributos derivados.
 perfil_rev_pd["atividade_log"] = np.log10(perfil_rev_pd["n_avaliacoes"])
 p_generos = perfil_rev_pd[cols_frac].to_numpy()
@@ -725,7 +1037,7 @@ perfil_rev_pd["genero_dominante"] = (perfil_rev_pd[[coluna_grupo[gr] for gr in g
 
 ATRIBUTOS_DERIVADOS = ["vies_usuario", "atividade_log", "popularidade_media", "ano_medio_lancamento", "diversidade_generos"]
 candidatos_rev = (["nota_media", "nota_dp"] + ATRIBUTOS_DERIVADOS
-                  + [coluna_grupo[gr] for gr in generos_mantidos] + ["frac_raros"])
+                  + [coluna_grupo[gr] for gr in generos_mantidos] + ["frac_raros"] + cols_dprel)
 print("\nAtributos derivados (por usuário):")
 print("  vies_usuario = média de (nota do usuário − média do filme): rigor do usuário sem o efeito dos filmes escolhidos")
 print("  atividade_log = log10(avaliações do usuário); popularidade_media = média de log10(avaliações dos filmes avaliados)")
@@ -767,21 +1079,23 @@ n_linhas = int(np.ceil(len(colunas_hist) / 5))
 fig, axes = plt.subplots(n_linhas, 5, figsize=(26, 4.4 * n_linhas))
 for ax, coluna in zip(axes.flat, colunas_hist):
     histograma_media_dp(ax, perfil_rev_pd[coluna], coluna, bins=40,
-                        cor="#7656a5" if coluna in ATRIBUTOS_DERIVADOS else "#4682a9",
-                        rotulo_x="proporção fracionária" if coluna.startswith("frac_") else "")
+                        cor="#7656a5" if coluna in ATRIBUTOS_DERIVADOS else ("#3f8f6b" if coluna in cols_dprel else "#4682a9"),
+                        rotulo_x="proporção fracionária" if coluna.startswith("frac_") else
+                        ("desvio no grupo − desvio geral (encolhido)" if coluna in cols_dprel else ""))
 for ax in list(axes.flat)[len(colunas_hist):]:
     ax.axis("off")
-fig.suptitle("Candidatos do vetor revisado (roxo = atributos derivados); média e ± 1 DP em vermelho", y=1.005)
+fig.suptitle("Candidatos do vetor revisado (roxo = atributos derivados; verde = desvio relativo por grupo); "
+             "média e ± 1 DP em vermelho", y=1.005)
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Grupos do perfil:** 17 grupos (os 19 gêneros, sem IMAX e com Animation e Children juntos). Participação fracionária: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3% e Romance 6,8% lideram. Doze grupos ficam acima do limite de 2%.
+# - **Grupos do perfil:** 17 grupos (os 18 gêneros, com Animation e Children juntos). Participação fracionária: Drama 20,8%, Comedy 17,1%, Action 9,6%, Thriller 9,2%, Adventure 7,3% e Romance 6,8% lideram. Doze grupos ficam acima do limite de 2%.
 # - **Animation/Children:** com 3,34%, o grupo fica acima do limite. Na v7, Animation (1,66%) caía em `raros`, junto com Film-Noir e Documentary, e Children (2,38%) ficava sozinho. O grupo tem menos que a soma dos dois (4,03%): contado uma vez só por filme, ele passa a outros gêneros o peso que antes ia duas vezes para o mesmo público. No exemplo, cada avaliação de Toy Story dava 1/5 a cada um dos 5 gêneros e passa a dar 1/4 a cada um dos 4 grupos.
-# - **Sobreposição:** 77,6% das avaliações de Animation são de filmes também Children, mas só 59,6% das de Children são de filmes também Animation, e o Jaccard nos filmes é 0,21. Os dois não são equivalentes, e a correlação entre usuários (0,82 na 3.2) fica abaixo do limiar de redundância. A junção é uma escolha de taxonomia: o grupo descreve o público de animação e infantil.
-# - **IMAX:** sai do perfil, porque é formato de exibição. A fração dele vai para os outros gêneros do filme (Avatar: de 1/4 para 1/3 em Action, Adventure e Sci-Fi). Só 1 filme tem apenas IMAX, com 27 avaliações, que ficam fora das proporções.
+# - **Sobreposição:** 77,6% das avaliações de Animation são de filmes também Children, mas só 59,6% das de Children são de filmes também Animation, e o Jaccard nos filmes é 0,21. Os dois não são equivalentes, mas a correlação entre usuários (Pearson 0,823; Spearman 0,804) passa do limiar de 0,8, e por isso `prop_children` sai do vetor base (3.2). Aqui, em vez de descartar um dos dois, a junção guarda os dois públicos num grupo só: é uma escolha de taxonomia.
+# - **IMAX:** já saiu na limpeza (2.2). A fração que ele levava vai para os outros gêneros do filme (Avatar: de 1/4 para 1/3 em Action, Adventure e Sci-Fi), e o único filme só com IMAX recebeu gênero do IMDb (2.2-b); todo filme tem pelo menos um grupo.
 # - **Gêneros raros:** War, Musical, Documentary, Western e Film-Noir somam 5,27% das avaliações e formam o grupo `raros`.
 # - **Sensibilidade do limite:** com 1,5%, só War muda de lado (fica sozinho); com 2,5%, só Mystery (vai para `raros`). Nenhum outro grupo muda entre 1,5% e 2,5%, e o limite fica em 2%.
 # - **Atributos derivados:**
@@ -790,7 +1104,8 @@ plt.show()
 #   - popularidade média: 4,04, ou seja, o filme típico visto por um usuário tem cerca de 11 mil avaliações;
 #   - ano médio dos filmes vistos: 1994, com DP de 7,3 anos;
 #   - diversidade de gêneros: 0,80, com DP 0,06.
-# - **Redundância:** o par mais associado é nota média × viés do usuário (Pearson 0,903; Spearman 0,881). Como só um dos dois critérios passa de 0,9, os dois ficam. Nenhum atributo foi removido, e o vetor revisado tem 20 atributos.
+# - **Desvio relativo por grupo:** o desvio no grupo existe (2 ou mais avaliações) para 71,2% dos usuários em Horror, 83,6% em Mystery, 83,8% em Animation/Children, 93,6% em `raros` e mais de 89% nos demais grupos; nos outros casos, o atributo vale 0. Na conferência, o usuário 1 tem 53 notas de Drama, desvio de 1,0477 no grupo e 1,0042 no geral: 53/58 × 0,0435 = 0,0397.
+# - **Redundância:** o par mais associado é nota média × viés do usuário (Pearson 0,903; Spearman 0,881), que passa do limiar de 0,8. Sai `nota_media`, que tem o maior |Pearson| médio com os demais; o viés guarda o rigor do usuário sem o efeito dos filmes que ele escolheu. Os desvios relativos não são redundantes com nada. O vetor revisado tem 32 atributos: 6 de nota e de comportamento (desvio-padrão geral da nota, viés, atividade, popularidade, ano médio e diversidade), 13 proporções fracionárias e 13 desvios relativos.
 # - **Gênero dominante:** Drama em 54,3% dos usuários, Comedy em 28,0% e Action em 8,2%.
 #
 # **Limitação:** o limite de 2% e os grupos são escolhas registradas. A animação adulta (anime, por exemplo) entra no grupo de animação e infantil, porque só 21% dos filmes têm os dois gêneros; os rótulos dos dados continuam separados.
@@ -798,34 +1113,34 @@ plt.show()
 # %% [markdown]
 # #### Comparação entre o vetor base e o vetor revisado
 #
-# Os dois vetores são comparados com os mesmos critérios e amostras das seções anteriores: PCA com Kaiser-Guttman, broken-stick e 80% da variância (3.4); contraste e variância relativa na amostra de 2.000 usuários (3.5); dimensionalidade intrínseca na amostra de 10.000 (3.5-b); atípicos e estatística de Hopkins com as regras de 3.7. O vetor base continua disponível, e a escolha da entrada de P1 é registrada em 3.10.
+# O vetor revisado passa pelo mesmo PCA de 3.4 (min-max, covariância) e pelos mesmos critérios de d′, com a mesma regra: o PCA principal usa d′ = ⌈D2⌉, e o broken-stick é a alternativa compacta. Os dois vetores são comparados nas mesmas amostras das seções anteriores: concentração de distâncias (3.5, 2.000 usuários), dimensionalidade intrínseca (3.5-b: D2 em 5.000 e MLE em 10.000), atípicos e estatística de Hopkins com as regras de 3.7. O vetor base continua disponível, e a escolha da entrada de P1 é registrada em 3.10.
 
 # %%
 # [3.8-b] Vetor base × vetor revisado: PCA, concentração de distâncias, dimensionalidade, atípicos e tendência
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import pdist
 from scipy import stats
 
 X_rev_original = perfil_rev_pd[atributos_rev].astype(float)
-X_rev_padronizado = pd.DataFrame(StandardScaler().fit_transform(X_rev_original), columns=atributos_rev, index=perfil_pd.index)
-pca_rev = PCA(svd_solver="full").fit(X_rev_padronizado)
-autovalores_rev = pca_rev.explained_variance_
-variancia_rev = 100 * pca_rev.explained_variance_ratio_
-n_atr = len(atributos_rev)
-broken_rev = 100 * np.array([sum(1.0 / j for j in range(i, n_atr + 1)) / n_atr for i in range(1, n_atr + 1)])
-d_rev = int((autovalores_rev >= 1).sum())
-d_broken_rev = int(np.argmax(variancia_rev <= broken_rev)) if (variancia_rev <= broken_rev).any() else n_atr
-d_80_rev = int(np.searchsorted(np.cumsum(variancia_rev), 80) + 1)
-X_rev_pca = pd.DataFrame(pca_rev.transform(X_rev_padronizado)[:, :d_rev],
-                         columns=[f"CP{k}" for k in range(1, d_rev + 1)], index=perfil_pd.index)
-print(f"PCA do vetor revisado: d′ = {d_rev} (Kaiser-Guttman, {np.cumsum(variancia_rev)[d_rev - 1]:.2f}% da variância); "
-      f"broken-stick = {d_broken_rev}; 80% da variância = {d_80_rev}")
+X_rev_minmax = pd.DataFrame(MinMaxScaler().fit_transform(X_rev_original), columns=atributos_rev, index=perfil_pd.index)
+res_rev = criterios_pca(X_rev_minmax)
+pca_rev, acumulada_rev = res_rev["pca"], res_rev["acum"]
+print(f"PCA do vetor revisado sobre a matriz min-max ({X_rev_minmax.shape[1]} atributos), centralizada; "
+      "autovalores da covariância")
+imprimir_criterios(res_rev)
+d_rev, d_bs_rev = res_rev["criterios"]["dimensão intrínseca: D2"], res_rev["criterios"]["broken-stick"]
+projecao_rev = pca_rev.transform(X_rev_minmax)
+X_rev_pca = pd.DataFrame(projecao_rev[:, :d_rev], columns=[f"CP{k}" for k in range(1, d_rev + 1)], index=perfil_pd.index)
+X_rev_pca_bs = pd.DataFrame(projecao_rev[:, :d_bs_rev], columns=[f"CP{k}" for k in range(1, d_bs_rev + 1)],
+                            index=perfil_pd.index)
+print(f"\nPCA do vetor revisado: d′ = {d_rev} (dimensão intrínseca, {100 * acumulada_rev[d_rev - 1]:.2f}% da variância); "
+      f"alternativa compacta: {d_bs_rev} pelo broken-stick ({100 * acumulada_rev[d_bs_rev - 1]:.2f}%)")
 cargas_rev = pd.DataFrame(pca_rev.components_[:d_rev].T, index=atributos_rev, columns=X_rev_pca.columns)
 for cp in cargas_rev.columns:
     principais = cargas_rev[cp].abs().sort_values(ascending=False).head(4).index
-    print(f"  {cp} ({variancia_rev[int(cp[2:]) - 1]:.2f}%): " + ", ".join(f"{a} ({cargas_rev.loc[a, cp]:+.2f})" for a in principais))
+    print(f"  {cp} ({100 * res_rev['escala'][int(cp[2:]) - 1]:.2f}%): "
+          + ", ".join(f"{a} ({cargas_rev.loc[a, cp]:+.2f})" for a in principais))
 
 
 def atipicos_no_espaco(X):
@@ -838,95 +1153,107 @@ def atipicos_no_espaco(X):
 
 
 perfil_rev_pd["atipico_rev"] = atipicos_no_espaco(X_rev_pca)
-# Alternativa registrada em 3.4: o PCA com os componentes que somam 80% da variância, nos dois vetores. Só comparação.
-X_rev_pca80 = pd.DataFrame(pca_rev.transform(X_rev_padronizado)[:, :d_80_rev],
-                           columns=[f"CP{k}" for k in range(1, d_80_rev + 1)], index=perfil_pd.index)
 espacos_comparacao = [
-    ("base", "z-score", X_p1_padronizado, np.nan, np.nan),
-    ("base", "PCA", X_p1_pca, 100 * acumulada[d_pca - 1], int(perfil_pd["atipico"].sum())),
-    ("revisado", "z-score", X_rev_padronizado, np.nan, np.nan),
-    ("revisado", "PCA", X_rev_pca, np.cumsum(variancia_rev)[d_rev - 1], int(perfil_rev_pd["atipico_rev"].sum())),
-    ("base", "PCA 80%", X_p1_pca80, 100 * acumulada[d_variancia - 1], int(atipicos_no_espaco(X_p1_pca80).sum())),
-    ("revisado", "PCA 80%", X_rev_pca80, np.cumsum(variancia_rev)[d_80_rev - 1], int(atipicos_no_espaco(X_rev_pca80).sum())),
+    ("base", "min-max", X_p1_minmax, np.nan, np.nan),
+    ("base", "PCA (D2)", X_p1_pca, 100 * acumulada[d_pca - 1], int(perfil_pd["atipico"].sum())),
+    ("base", "PCA (broken-stick)", X_p1_pca_bs, 100 * acumulada[d_bs - 1], int(atipicos_no_espaco(X_p1_pca_bs).sum())),
+    ("revisado", "min-max", X_rev_minmax, np.nan, np.nan),
+    ("revisado", "PCA (D2)", X_rev_pca, 100 * acumulada_rev[d_rev - 1], int(perfil_rev_pd["atipico_rev"].sum())),
+    ("revisado", "PCA (broken-stick)", X_rev_pca_bs, 100 * acumulada_rev[d_bs_rev - 1],
+     int(atipicos_no_espaco(X_rev_pca_bs).sum())),
 ]
 linhas_comp = []
 for vetor, espaco, X, var_retida, n_atipicos in espacos_comparacao:
-    d = pdist(X.loc[idx_dist].to_numpy(), metric="euclidean")
+    Xn = X.to_numpy()
+    d = pdist(Xn[idx_dist], metric="euclidean")
     d = d[d > 0]
-    id_media, _ = dimensao_intrinseca_mle(X.loc[idx_id].to_numpy())
-    h_medio, h_dp, _, _ = hopkins(X.to_numpy(), "percentis 1–99")
+    id_media, _ = dimensao_intrinseca_mle(Xn[idx_id])
+    h_medio, h_dp, _, _ = hopkins(Xn, "percentis 1–99")
     linhas_comp.append((vetor, espaco, X.shape[1], var_retida, (d.max() - d.min()) / d.min(), d.std() / d.mean(),
-                        id_media, h_medio, n_atipicos))
+                        dimensao_correlacao(Xn)[0], id_media, h_medio, n_atipicos))
 tabela_comparacao = pd.DataFrame(linhas_comp, columns=["vetor", "espaço", "dimensões", "variância retida %",
-                                                       "contraste relativo", "variância relativa", "ID (MLE)",
+                                                       "contraste relativo", "variância relativa", "D2", "ID (MLE)",
                                                        "Hopkins (1–99)", "atípicos"])
-print("\nComparação nas mesmas amostras de 3.5 (2.000 usuários), 3.5-b (10.000) e 3.7 (Hopkins, m = 1.000, 10 repetições):")
+print("\nComparação nas mesmas amostras de 3.5 (2.000 usuários), 3.5-b (D2: 5.000; MLE: 10.000) e 3.7 "
+      "(Hopkins, m = 1.000, 10 repetições):")
 print(tabela_comparacao.round(4).to_string(index=False))
 ambos = int((perfil_pd["atipico"] & perfil_rev_pd["atipico_rev"]).sum())
 uniao = int((perfil_pd["atipico"] | perfil_rev_pd["atipico_rev"]).sum())
 print(f"Atípicos nos dois vetores: {ambos:,} (Jaccard = {ambos / uniao:.3f})")
-print("Atributo dominante dos atípicos do vetor revisado:",
-      X_rev_padronizado[perfil_rev_pd["atipico_rev"].to_numpy()].abs().idxmax(axis=1).value_counts().head(6).to_dict())
 
-fig, axes = plt.subplots(1, 3, figsize=(24, 6.5))
-pos = np.arange(1, n_atr + 1)
-axes[0].bar(pos, variancia_rev, color="#7656a5", label="variância explicada (%)")
-axes[0].plot(pos, broken_rev, "o--", color="#d18b24", label="broken-stick (%)")
-axes[0].axvline(d_rev + 0.5, color="crimson", ls=":", label=f"Kaiser: d′ = {d_rev}")
-axes[0].set(title="Scree plot do vetor revisado", xlabel="componente", ylabel="% da variância")
-axes[0].legend()
-imagem = axes[1].imshow(pearson_rev.loc[atributos_rev, atributos_rev], vmin=-1, vmax=1, cmap="coolwarm")
-axes[1].set_xticks(range(n_atr), atributos_rev, rotation=70, ha="right", fontsize=8)
-axes[1].set_yticks(range(n_atr), atributos_rev, fontsize=8)
-axes[1].set_title("Pearson entre os atributos do vetor revisado")
-fig.colorbar(imagem, ax=axes[1], shrink=.8)
+# Transparência: o mesmo vetor revisado sem os desvios relativos por grupo, com os mesmos critérios e amostras.
+sem_dprel = [a for a in atributos_rev if a not in cols_dprel]
+X_rev_sem_dp = pd.DataFrame(MinMaxScaler().fit_transform(perfil_rev_pd[sem_dprel].astype(float)), columns=sem_dprel,
+                            index=perfil_pd.index)
+res_sem_dp = criterios_pca(X_rev_sem_dp)
+d_sem_dp = res_sem_dp["criterios"]["dimensão intrínseca: D2"]
+X_sem_dp_pca = res_sem_dp["pca"].transform(X_rev_sem_dp)[:, :d_sem_dp]
+d = pdist(X_sem_dp_pca[idx_dist], metric="euclidean")
+d = d[d > 0]
+print(f"\nVetor revisado sem os desvios relativos ({len(sem_dprel)} atributos): D2 = {res_sem_dp['d2']:.2f}; d′ por critério: "
+      + "; ".join(f"{nome} {v}" for nome, v in res_sem_dp["criterios"].items())
+      + f". PCA (D2) com {d_sem_dp} componentes: {100 * res_sem_dp['acum'][d_sem_dp - 1]:.2f}% da variância; "
+      f"variância relativa das distâncias {d.std() / d.mean():.4f}; Hopkins (1–99) {hopkins(X_sem_dp_pca, 'percentis 1–99')[0]:.4f}; "
+      f"atípicos {int(atipicos_no_espaco(X_sem_dp_pca).sum()):,}")
+z_rev = (X_rev_original - X_rev_original.mean()) / X_rev_original.std(ddof=0)  # só para descrever, como em 3.7-a
+print("Atributo dominante dos atípicos do vetor revisado (maior |z|):",
+      z_rev[perfil_rev_pd["atipico_rev"].to_numpy()].abs().idxmax(axis=1).value_counts().head(6).to_dict())
+
+fig, axes = plt.subplots(2, 2, figsize=(25, 13))
+grafico_criterios(axes[0, 0], axes[0, 1], res_rev, "vetor revisado")
+n_atr = len(atributos_rev)
+imagem = axes[1, 0].imshow(pearson_rev.loc[atributos_rev, atributos_rev], vmin=-1, vmax=1, cmap="coolwarm")
+axes[1, 0].set_xticks(range(n_atr), atributos_rev, rotation=70, ha="right", fontsize=7)
+axes[1, 0].set_yticks(range(n_atr), atributos_rev, fontsize=7)
+axes[1, 0].set_title("Pearson entre os atributos do vetor revisado")
+fig.colorbar(imagem, ax=axes[1, 0], shrink=.8)
 dominante_vis = perfil_rev_pd.loc[idx_vis, "genero_dominante"]
 principais_dom = dominante_vis.value_counts().head(6).index
 for rotulo in list(principais_dom) + ["outros"]:
-    mascara = (dominante_vis.isin(principais_dom) == False) if rotulo == "outros" else (dominante_vis == rotulo)
+    mascara = (~dominante_vis.isin(principais_dom)) if rotulo == "outros" else (dominante_vis == rotulo)
     pontos = X_rev_pca.loc[idx_vis][mascara.to_numpy()]
-    axes[2].scatter(pontos["CP1"], pontos["CP2"], s=6, alpha=.55, label=f"{rotulo} ({mascara.sum()})")
-axes[2].set(title=f"Vetor revisado: CP1 × CP2 ({len(idx_vis):,} usuários; cor = gênero dominante)", xlabel="CP1", ylabel="CP2")
-axes[2].legend(markerscale=3, fontsize=8)
+    axes[1, 1].scatter(pontos["CP1"], pontos["CP2"], s=6, alpha=.55, label=f"{rotulo} ({mascara.sum()})")
+axes[1, 1].set(title=f"Vetor revisado: CP1 × CP2 ({len(idx_vis):,} usuários; cor = gênero dominante)",
+               xlabel="CP1", ylabel="CP2")
+axes[1, 1].legend(markerscale=3, fontsize=8)
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **PCA do vetor revisado:** 7 componentes por Kaiser-Guttman retêm 73,94% da variância, contra 66,84% com 6 componentes no vetor base. O broken-stick retém 3 componentes (contra 2), sinal de mais estrutura nos primeiros eixos.
-# - **Componentes:**
-#   - CP1 (20,9%): ação, aventura e ficção contra romance;
-#   - CP2 (14,7%): crime e suspense contra animação/infantil e fantasia;
-#   - CP3 (11,7%): nota média e viés do usuário;
-#   - CP4 (8,4%): atividade contra popularidade, ou seja, usuários muito ativos veem filmes menos populares;
-#   - CP5 (7,6%): gêneros raros, em usuários que veem filmes mais antigos;
-#   - CP6 (5,7%): ano médio dos filmes vistos;
-#   - CP7 (5,0%): atividade e comédia contra mistério e horror.
-# - **Distâncias:** no espaço PCA, o contraste relativo cai de 110,66 para 45,18 e a variância relativa, de 0,426 para 0,369: as distâncias ficam um pouco mais concentradas no vetor revisado. O contraste relativo depende só do par mais próximo e do mais distante da amostra, por isso oscila mais; a variância relativa usa todos os pares.
-# - **Dimensionalidade intrínseca:** 7,2 no PCA revisado e 12,0 no z revisado, contra 6,4 e 13,2 no vetor base.
-# - **Atípicos:** 1.171 no vetor revisado, contra 1.293 no base (−9%). Só 412 são atípicos nos dois (Jaccard 0,20). No vetor revisado, os atípicos se concentram em horror (327 usuários).
-# - **Hopkins (domínio robusto):** 0,68 no PCA revisado e 0,77 no z revisado, contra 0,70 e 0,77 no base. A tendência de agrupamento continua moderada.
-# - **Antes e depois dos grupos do perfil (transparência):** sem os grupos (v7), o PCA revisado tinha 6 componentes (69,13% da variância), 1.078 atípicos e Hopkins de 0,68. Com IMAX fora e Animation/Children juntos, passa a 7 componentes (73,94%), 1.171 atípicos e o mesmo Hopkins. A decisão dos grupos é de taxonomia e não depende desta comparação.
-# - **PCA com 80% da variância (9 componentes, só comparação):**
+# - **Critérios no vetor revisado (32 atributos):** broken-stick 4 componentes (48,10% da variância), Kaiser-Guttman 8 (64,29%), ρ-score 7,88 → 8, D2 = 8,25 → 9 (67,32%) e 80% da variância → 14. Pela regra fixada, o PCA principal tem 9 componentes, e o do broken-stick, 4.
+# - **O "fim estranho" do broken-stick volta neste vetor:** os autovalores 24 a 31 ficam acima da curva, e a regra do último acima daria 31 componentes, quase todos. A causa são os 13 desvios relativos: colunas fracas e quase independentes (no mapa de correlação, o bloco de baixo à direita é quase todo neutro), que formam um piso de autovalores pequenos e parecidos, enquanto a curva broken-stick cai para perto de zero. Esses cruzamentos não indicam estrutura, e por isso a regra usa os componentes iniciais acima da curva. O último autovalor é zero porque as 13 proporções fracionárias somam 1.
+# - **Componentes do PCA revisado:**
+#   - CP1 (18,4%): Adventure, Action e Sci-Fi contra Drama;
+#   - CP2 (11,4%): atividade, contra popularidade dos filmes vistos;
+#   - CP3 (10,5%): Thriller, Crime e atividade contra Comedy;
+#   - CP4 (7,8%): desvio-padrão geral da nota contra viés;
+#   - CP5 (5,1%): Comedy e Thriller contra Drama;
+#   - CP6 (3,9%) e CP7 (3,8%): os desvios relativos (variar mais as notas em aventura, ficção e fantasia; em fantasia e raros, contra mistério e suspense);
+#   - CP8 (3,5%) e CP9 (3,0%): ano médio dos filmes vistos.
+# - **Comparação** (mesmas amostras):
 #
-#   | | base, 6 | base, 9 | revisado, 7 | revisado, 9 |
-#   |---|---:|---:|---:|---:|
-#   | variância retida | 66,84% | 80,07% | 73,94% | 82,37% |
-#   | variância relativa das distâncias | 0,426 | 0,417 | 0,369 | 0,354 |
-#   | Hopkins (1–99) | 0,705 | 0,718 | 0,684 | 0,685 |
-#   | atípicos | 1.293 | 1.422 | 1.171 | 1.351 |
+#   | | base, min-max | base, PCA 7 | base, PCA 3 | revisado, min-max | revisado, PCA 9 | revisado, PCA 4 |
+#   |---|---:|---:|---:|---:|---:|---:|
+#   | variância retida | — | 85,73% | 64,91% | — | 67,32% | 48,10% |
+#   | variância relativa das distâncias | 0,355 | 0,391 | 0,475 | 0,250 | 0,310 | 0,393 |
+#   | D2 | 6,17 | 4,89 | 2,83 | 8,25 | 5,90 | 3,61 |
+#   | ID (MLE) | 11,9 | 7,2 | 3,3 | 17,6 | 8,8 | 4,3 |
+#   | Hopkins (1–99) | 0,752 | 0,678 | 0,654 | 0,692 | 0,656 | 0,671 |
+#   | atípicos | — | 1.156 | 612 | — | 1.348 | 603 |
 #
-#   Com 9 componentes, os dois vetores guardam mais informação e a tendência de agrupamento sobe um pouco no vetor base. Em troca, as distâncias ficam um pouco menos nítidas e aparecem mais atípicos. As diferenças são pequenas nos dois sentidos, e a escolha entre 6 ou 7 e 9 componentes fica para P1, pela qualidade dos grupos.
+# - **Atípicos:** 1.348 no vetor revisado, contra 1.156 no base; só 377 são atípicos nos dois (Jaccard 0,18). No revisado, o atributo mais extremo é Horror (128 usuários) ou um desvio relativo (Comedy 78, Thriller 77, Drama 76).
+# - **Efeito dos desvios relativos (transparência):** sem eles, o vetor revisado tem 19 atributos, D2 = 6,41 e d′ = 7, que guardam 80,34% da variância; a variância relativa das distâncias é 0,344, o Hopkins 0,681 e há 1.070 atípicos. Com eles, são 9 componentes para 67,32%, distâncias mais concentradas (0,310), Hopkins 0,656 e 1.348 atípicos.
 #
-# **Interpretação:** o vetor revisado guarda mais variância, gera menos atípicos e acrescenta eixos interpretáveis (atividade, popularidade e época), ao custo de um componente a mais. As distâncias ficam um pouco mais concentradas, e a tendência de agrupamento fica próxima da do vetor base.
+# **Interpretação:** o vetor revisado ganha representação: proporções que somam 1, atividade, popularidade, época e, agora, a forma como o usuário varia as notas em cada grupo. Mas os desvios relativos acrescentam muitas direções fracas: o vetor precisa de mais componentes para guardar menos variância, e as distâncias ficam mais concentradas. O vetor base em min-max, com 19 atributos, é o que mostra a tendência de agrupamento mais alta (0,752) e o PCA principal do vetor base é o que guarda mais variância (85,73% em 7 componentes).
 #
-# **Consequência:** o PCA do vetor revisado passa a ser a entrada principal de P1, pelos ganhos de representação: proporções que somam 1, sem contagem dupla de gêneros, com atividade e popularidade. O vetor base fica como comparação, também para medir o efeito da concentração de distâncias um pouco maior.
+# **Consequência:** a entrada principal registrada continua o PCA do vetor revisado (9 componentes), pelos ganhos de representação. O custo medido dos desvios relativos fica registrado, e P1 compara essa entrada com o PCA do vetor base (7 componentes) e com o vetor revisado sem os desvios (7 componentes), pela qualidade dos grupos.
 
 # %% [markdown]
 # ### 3.9 Solução indexada para buscas por similaridade
 #
-# P1 depende de buscas por similaridade: o DBSCAN faz buscas por abrangência (todos os vizinhos dentro de um raio), a escolha desse raio usa a distância ao k-ésimo vizinho, e o kNN busca os k mais próximos. Com 162.541 usuários, a varredura linear compara cada consulta com todos os objetos. A célula compara, nos quatro espaços candidatos:
+# P1 depende de buscas por similaridade: o DBSCAN faz buscas por abrangência (todos os vizinhos dentro de um raio), a escolha desse raio usa a distância ao k-ésimo vizinho, e o kNN busca os k mais próximos. Com 162.541 usuários, a varredura linear compara cada consulta com todos os objetos. A célula compara, nos seis espaços candidatos (PCA principal, matriz min-max e PCA do broken-stick, nos dois vetores):
 #
 # - **varredura linear:** referência exata;
 # - **kd-tree e ball-tree:** índices exatos por particionamento do espaço;
@@ -952,11 +1279,11 @@ except ImportError:
 K_INDICE, N_CONSULTAS_KNN, N_CONSULTAS_RAIO, N_CONSULTAS_PIVO, P_MAX = 10, 1000, 200, 100, 16
 espacos_indice = {
     f"base PCA ({X_p1_pca.shape[1]})": X_p1_pca.to_numpy(),
-    f"base z ({X_p1_padronizado.shape[1]})": X_p1_padronizado.to_numpy(),
+    f"base min-max ({X_p1_minmax.shape[1]})": X_p1_minmax.to_numpy(),
     f"revisado PCA ({X_rev_pca.shape[1]})": X_rev_pca.to_numpy(),
-    f"revisado z ({X_rev_padronizado.shape[1]})": X_rev_padronizado.to_numpy(),
-    f"base PCA 80% ({X_p1_pca80.shape[1]})": X_p1_pca80.to_numpy(),
-    f"revisado PCA 80% ({X_rev_pca80.shape[1]})": X_rev_pca80.to_numpy(),
+    f"revisado min-max ({X_rev_minmax.shape[1]})": X_rev_minmax.to_numpy(),
+    f"base PCA broken-stick ({X_p1_pca_bs.shape[1]})": X_p1_pca_bs.to_numpy(),
+    f"revisado PCA broken-stick ({X_rev_pca_bs.shape[1]})": X_rev_pca_bs.to_numpy(),
 }
 rng_indice = np.random.default_rng(7)
 consultas_idx = rng_indice.choice(len(perfil_pd), size=N_CONSULTAS_KNN, replace=False)
@@ -1057,57 +1384,55 @@ plt.show()
 # %% [markdown]
 # **Leitura dos resultados.**
 #
-# - **Espaços PCA (6 ou 7 dimensões):** a kd-tree é o índice exato mais rápido: 0,17 s para 1.000 buscas kNN no PCA revisado, contra 0,53 s da varredura linear. A ball-tree não ganha da varredura.
-# - **Espaços z (20 ou 21 dimensões):** as árvores ficam muito mais lentas que a varredura linear (kd-tree 5,0 a 6,4 s; ball-tree 12,0 a 12,6 s; varredura 0,6 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
-# - **HNSW:** 1.000 buscas em 0,013 a 0,026 s, com recall@10 de 0,98 a 1,00 já com efSearch = 16. O custo fica na construção (5,0 a 8,9 s).
-# - **PCA com 80% da variância (9 componentes):** a kd-tree perde a vantagem. Nas 1.000 buscas kNN, leva 0,33 s no vetor base e 0,54 s no revisado, contra 0,57 s e 0,56 s da varredura; nas buscas por abrangência, fica 2 a 4 vezes mais lenta que a varredura (0,12 e 0,22 s, contra 0,05 e 0,06 s). Com 16 pivôs, a busca por abrangência descarta 99,2% (base) e 99,0% (revisado) das distâncias. O HNSW continua rápido (0,026 e 0,015 s, recall@10 de 1,00).
-# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,9% das distâncias no PCA base e 99,8% no PCA revisado, contra 92,2% (z revisado) e 89,2% (z base). Na maioria dos casos, a seleção incremental supera a de variância máxima, sobretudo nos espaços z: com 2 pivôs no z revisado, cerca de 59% contra 46%.
+# - **PCA principal do vetor base (7 dimensões):** a kd-tree é o índice exato mais rápido nas buscas kNN: 0,28 s para 1.000 buscas, contra 0,74 s da varredura linear. Nas buscas por abrangência, as duas empatam (0,085 s). A ball-tree não ganha da varredura (2,55 s).
+# - **PCA principal do vetor revisado (9 dimensões):** a kd-tree perde a vantagem: 0,90 s contra 0,81 s da varredura nas buscas kNN, e 0,23 s contra 0,12 s nas buscas por abrangência.
+# - **PCA do broken-stick (3 e 4 dimensões):** é onde os índices mais ganham: a kd-tree faz as 1.000 buscas kNN em 0,03 s, contra 0,75 a 0,95 s da varredura (25 a 32 vezes mais rápida), e as buscas por abrangência em 0,008 a 0,009 s.
+# - **Espaços min-max (19 e 32 atributos):** as árvores ficam muito mais lentas que a varredura linear (no vetor base, kd-tree 4,9 s e ball-tree 15,2 s; no revisado, 23,7 s e 30,3 s; varredura de 1,0 a 1,1 s). É o efeito da dimensionalidade: os particionamentos deixam de descartar regiões.
+# - **HNSW:** 1.000 buscas em 0,02 a 0,06 s com efSearch = 16, com recall@10 de 0,99 ou mais, exceto no min-max revisado (0,958; 0,993 com efSearch = 64). O custo fica na construção (7 a 18 s).
+# - **Pivôs:** com 16 pivôs de seleção incremental, a busca por abrangência descarta 99,6% das distâncias no PCA base, 99,2% no PCA revisado e 99,98% nos espaços do broken-stick, contra 95,3% no min-max base e só 67,1% no min-max revisado, de 32 atributos. Na maioria dos casos, a seleção incremental supera a de variância máxima (com 8 pivôs no min-max revisado, 60,2% contra 50,0%).
 #
 # **Limitação:** os tempos dependem da máquina (Colab gratuito); a fração de distâncias evitadas não.
 #
-# **Consequência:** P1 usa o espaço PCA, onde os índices funcionam. As buscas exatas (DBSCAN e distância ao k-ésimo vizinho) usam kd-tree ou pivôs com seleção incremental, e o HNSW atende buscas aproximadas. Se P1 usar o PCA com 9 componentes, as buscas exatas por abrangência (DBSCAN) devem usar pivôs ou a varredura, e não a kd-tree.
+# **Consequência:** P1 usa os espaços PCA, onde os índices funcionam. No PCA principal do vetor base e nos espaços do broken-stick, as buscas exatas (DBSCAN e distância ao k-ésimo vizinho) usam a kd-tree; no PCA revisado, de 9 dimensões, as buscas exatas por abrangência usam pivôs com seleção incremental ou a varredura, e não a kd-tree. O HNSW atende as buscas aproximadas. Nos espaços min-max, só a varredura ou o HNSW.
 
 # %% [markdown]
 # ### 3.10 Resultado da transformação e entrada de P1
 #
 # | Objeto | Conteúdo | Uso em P1 |
 # |---|---|---|
-# | `perfil_pd` | `userId`, `n_avaliacoes` e 23 atributos derivados | identificar e descrever os grupos |
-# | `X_p1_padronizado` | 21 atributos (média, DP e 19 proporções de gênero), z-score | entrada candidata interpretável |
-# | `X_p1_minmax` | os mesmos 21 atributos em [0, 1] | alternativa de escala |
-# | `X_p1_pca` | 6 componentes principais (critério de Kaiser-Guttman, 66,84%) | entrada candidata com dimensionalidade reduzida |
-# | `X_p1_pca80`, `X_rev_pca80` | 9 componentes, 80% da variância, nos dois vetores (80,07% e 82,37%) | alternativa a testar em P1 |
-# | `perfil_pd["atipico"]` | 1.293 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
-# | `perfil_rev_pd` | atributos derivados, proporções fracionárias, gênero dominante e `atipico_rev` (1.171 usuários) | descrever os grupos do vetor revisado |
-# | `X_rev_padronizado` | 20 atributos do vetor revisado, z-score | entrada alternativa interpretável |
-# | `X_rev_pca` | 7 componentes do vetor revisado (Kaiser-Guttman, 73,94%) | **entrada principal de P1** |
+# | `perfil_pd` | `userId`, `n_avaliacoes`, 22 atributos do perfil e 18 desvios-padrão da nota por gênero | identificar e descrever os grupos |
+# | `X_p1_minmax` | 19 atributos do vetor base (nota média, desvio-padrão e 17 proporções de gênero), em min-max | entrada candidata interpretável |
+# | `X_p1_padronizado` | os mesmos 19 atributos em z-score | só comparação (3.3) e critério univariado de atípicos (3.7-a) |
+# | `X_p1_pca` | 7 componentes principais do vetor base (dimensão intrínseca D2 = 6,17; 85,73%) | entrada candidata com dimensionalidade reduzida |
+# | `X_p1_pca_bs`, `X_rev_pca_bs` | 3 e 4 componentes, pelo broken-stick (64,91% e 48,10%) | alternativa compacta a testar em P1 |
+# | `perfil_pd["atipico"]` | 1.156 usuários longe do centro e isolados dos vizinhos (3.7) | executar P1 com e sem esses usuários |
+# | `perfil_rev_pd` | atributos derivados, proporções fracionárias, desvios relativos por grupo, gênero dominante e `atipico_rev` (1.348 usuários) | descrever os grupos do vetor revisado |
+# | `X_rev_minmax` | 32 atributos do vetor revisado, em min-max | entrada alternativa interpretável |
+# | `X_rev_pca` | 9 componentes do vetor revisado (D2 = 8,25; 67,32%) | **entrada principal de P1** |
 #
 # **Resultados desta execução:**
 #
-# - **Seleção de características:** apenas `nota_media × prop_positivas` atingiu o limiar de redundância (Pearson 0,922; Spearman 0,946). O segundo par mais associado, `prop_animation × prop_children` (0,823 / 0,804), ficou abaixo do limiar, então os dois atributos foram mantidos.
-# - **Escalas:**
-#   - no z-score, cada atributo tem o mesmo peso na variância total (4,76%), mas gêneros raros geram valores extremos: máximos de 47,1 em Documentary, 38,9 em Western e 38,2 em Film-Noir;
-#   - no min-max, os gêneros mais frequentes dominam a distância: Action pesa 11,54% e Drama 10,12%, contra 0,23% de Documentary.
-# - **PCA:**
-#   - d′ = 6 por Kaiser-Guttman (66,84% da variância);
-#   - d′ = 2 por broken-stick;
-#   - d′ = 9 para 80% da variância acumulada.
-#   - Os dois primeiros componentes explicam 39,68% e opõem, respectivamente, perfis infantis/fantasia e ação/ficção científica contra romance/comédia.
+# - **Pré-processamento que chega aqui:** o IMAX saiu da lista de gêneros na limpeza (2.2), e o perfil tem 18 gêneros.
+# - **Perfil:** além das proporções, o desvio-padrão da nota em cada gênero, que existe para 21,7% (Documentary) a 99,9% (Drama) dos usuários.
+# - **Seleção de características (limiar 0,8):** saem `prop_positivas` (decisão própria) e `prop_children`, redundante com `prop_animation` (Pearson 0,823; Spearman 0,804); o vetor base tem 19 atributos.
+# - **Escalas:** o min-max passa a ser a base do PCA. No z-score, os gêneros raros chegam a 47,1 desvios-padrão (Documentary); no min-max, os gêneros frequentes pesam mais na distância (Action 12,62%, contra 0,25% de Documentary).
+# - **PCA (min-max, covariância), d′ por critério:** broken-stick 3 (64,91%), Kaiser-Guttman 4 (72,46%), ρ-score 4, 80% da variância 6 (82,07%) e dimensão de correlação D2 = 6,17 → 7 (85,73%). Pela regra fixada, o PCA principal tem 7 componentes. Os dois primeiros explicam 54,06% e opõem ação, aventura e ficção a drama (CP1) e comédia a drama, suspense e crime (CP2).
 # - **Concentração de distâncias** (2.000 usuários, distância euclidiana):
 #
 #   | Espaço | Contraste relativo | Variância relativa |
 #   |---|---:|---:|
-#   | z-score, 21 atributos | 33,22 | 0,3740 |
-#   | min-max, 21 atributos | 22,24 | 0,3590 |
-#   | PCA, 6 componentes | 110,66 | 0,4259 |
-#   | PCA 80%, 9 componentes | 92,57 | 0,4173 |
+#   | min-max, 19 atributos | 23,10 | 0,3550 |
+#   | PCA, 3 componentes (broken-stick) | 651,43 | 0,4750 |
+#   | PCA, 4 componentes (Kaiser-Guttman e ρ-score) | 176,25 | 0,4358 |
+#   | PCA, 6 componentes (80% da variância) | 73,95 | 0,4065 |
+#   | PCA, 7 componentes (D2) | 72,23 | 0,3905 |
 #
-#   Os espaços PCA foram os que menos concentraram as distâncias (o de 6 componentes um pouco menos que o de 9), e o min-max, o que mais concentrou.
+#   Quanto menos componentes, menos concentradas as distâncias, e mais variância descartada.
 #
-# - **Dimensionalidade intrínseca:** cerca de 13 no espaço z de 21 atributos. As projeções 2D mostram uma nuvem contínua, sem grupos isolados.
-# - **Valores atípicos:** 1.293 usuários (0,80%) estão longe do centro e isolados; em geral, têm poucas avaliações concentradas em gêneros raros (Documentary, Film-Noir, Western e War). Foram mantidos e marcados.
-# - **Tendência de agrupamento:** estatística de Hopkins de 0,705 (PCA) e 0,767 (z-score) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
-# - **Vetor revisado (3.8):** proporções fracionárias, IMAX fora, Animation e Children num grupo só, gêneros raros agrupados, sem contagem dupla e com cinco atributos derivados. Retém 73,94% da variância em 7 componentes (o base, 66,84% em 6), tem 9% menos atípicos (1.171) e Hopkins de 0,68 no PCA, com distâncias um pouco mais concentradas.
-# - **Solução indexada (3.9):** no espaço PCA, a kd-tree faz 1.000 buscas kNN em 0,17 s (varredura: 0,53 s), 16 pivôs descartam 99,9% das distâncias e o HNSW chega a recall de 100%. Nos espaços z, as árvores ficam mais lentas que a varredura.
+# - **Dimensionalidade intrínseca:** no min-max, D2 = 6,17, ρ-score = 3,95 e MLE = 11,94. Por gênero (3.5-c), o público de todos os 18 gêneros precisa de 7 componentes, como os usuários sorteados; as diferenças de D2 entre gêneros têm o tamanho do efeito de qualquer seleção de 10% dos usuários, e o que muda é a forma (o 1º componente guarda de 27,0% a 37,5% da variância do público).
+# - **Valores atípicos:** 1.156 usuários (0,71%) estão longe do centro e isolados; em geral, são extremos em Horror, Animation ou na forma de dar notas, com poucas avaliações. Foram mantidos e marcados.
+# - **Tendência de agrupamento:** estatística de Hopkins de 0,678 (PCA principal), 0,752 (min-max) e 0,654 (PCA do broken-stick) no domínio robusto, contra 0,500 nos dados uniformes de controle. Os usuários são mais concentrados que dados uniformes, mas a tendência é moderada.
+# - **Vetor revisado (3.8):** proporções fracionárias, Animation e Children num grupo só, gêneros raros agrupados, cinco atributos derivados e o desvio relativo da nota em cada grupo; sai `nota_media`, redundante com o viés. Com 32 atributos, o PCA principal tem 9 componentes (67,32%); o broken-stick dá 4, e o fim do scree plot volta a cruzar a curva por causa dos desvios relativos. Sem os desvios, o mesmo vetor teria 7 componentes com 80,34%, distâncias menos concentradas e Hopkins um pouco maior.
+# - **Solução indexada (3.9):** no PCA principal do vetor base, a kd-tree faz 1.000 buscas kNN em 0,28 s (varredura: 0,74 s); no PCA revisado, de 9 dimensões, perde a vantagem (0,90 s contra 0,81 s). Com 16 pivôs, as buscas por abrangência descartam 99,6% (base) e 99,2% (revisado) das distâncias, e o HNSW responde em centésimos de segundo com recall de 0,99 ou mais. Nos espaços min-max, as árvores ficam muito mais lentas que a varredura (até 30 s contra 1 s com 32 atributos).
 #
-# **Consequência para P1:** a entrada principal é `X_rev_pca`, o PCA do vetor revisado. Ele guarda mais variância, gera menos atípicos, não depende da contagem dupla de gêneros e trata animação e infantil como um público só. O PCA do vetor base e as matrizes z-score ficam como comparação, e o PCA com 80% da variância (9 componentes, nos dois vetores) é a alternativa a testar: guarda mais informação, mas tem mais atípicos e distâncias um pouco menos nítidas (3.8-b). As buscas de vizinhos usam kd-tree ou pivôs no espaço PCA, e HNSW quando uma resposta aproximada basta. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.
+# **Consequência para P1:** a entrada principal registrada é `X_rev_pca`, o PCA do vetor revisado, pelos ganhos de representação: proporções que somam 1, sem contagem dupla de gêneros, com atividade, popularidade, época e a forma como o usuário varia as notas em cada grupo. Como os desvios relativos cobram um preço medido (menos variância por componente e distâncias mais concentradas), P1 compara essa entrada com o PCA do vetor base (7 componentes) e com o vetor revisado sem os desvios (7 componentes), e com as alternativas do broken-stick. As buscas de vizinhos usam os índices medidos em 3.9. P1 deve ser executado com e sem os usuários atípicos, e seus índices devem ser comparados com os de partições de dados uniformes.

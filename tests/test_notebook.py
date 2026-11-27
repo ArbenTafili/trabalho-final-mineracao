@@ -65,6 +65,10 @@ def test_executa_inteiro_com_dados_sinteticos(tmp_path_factory):
     assert valores["cópias fundidas (títulos repetidos)"] == "1"  # só a "Cópia Duplicada"; as outras ficam separadas
     assert valores["filmes excluídos (sem gênero)"] not in ("—", "0")
     assert float(valores["diferença máxima da nota após tratamento (p.p.)"]) < 0.5
-    assert valores["grupos do perfil (vetor revisado)"] == "17"  # 19 gêneros, sem IMAX, Animation + Children juntos
+    assert valores["grupos do perfil (vetor revisado)"] == "17"  # 18 gêneros (IMAX saiu na 2.2), Animation + Children juntos
+    assert valores["filmes com IMAX retirado do gênero"] not in ("—", "0")
+    assert valores["filmes só com IMAX preenchidos pelo IMDb"] == "1 de 1"  # fica sem gênero e o IMDb preenche
+    for nome in ("d′ do vetor base (⌈D2⌉)", "d′ do vetor base (broken-stick)", "d′ do vetor revisado (⌈D2⌉)"):
+        assert valores[nome] != "—", nome
     assert valores["filmes com gênero do IMDb"] != "—"
     assert valores["mínimo de avaliadores (kNN)"] != "—"

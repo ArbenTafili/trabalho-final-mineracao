@@ -21,6 +21,8 @@ CONTROLES = [
     ("SSE do V-Optimal", r"SSE total = ([\d.]+)"),
     ("η década × média por filme", r"Razão de correlação η=([\d.]+)"),
     ("Pearson média × positivas", r"nota_media × prop_positivas: Pearson=([\d.]+)"),
+    ("filmes com IMAX retirado do gênero", r"IMAX retirado da lista de gêneros: ([\d,]+) filmes"),
+    ("filmes só com IMAX preenchidos pelo IMDb", r"Filmes que só tinham IMAX \(2\.2\) com gênero do IMDb: (\d+ de \d+)"),
     ("filmes com gênero do IMDb", r"Filmes com gênero do IMDb: ([\d,]+)"),
     ("filmes que continuam sem gênero", r"continuam sem gênero: ([\d,]+)"),
     ("acerto kNN, filmes com 10+ avaliadores (%)", r"Filmes com 10 ou mais avaliadores: kNN ([\d.]+)%"),
@@ -31,11 +33,18 @@ CONTROLES = [
     ("avaliações excluídas (sem gênero)", r"Avaliações excluídas: ([\d,]+)"),
     ("filmes no catálogo depois da limpeza", r"avaliações, ([\d,]+) filmes no catálogo"),
     ("diferença máxima da nota após tratamento (p.p.)", r"maior diferença de proporção = ([\d.]+) p\.p\."),
+    ("atributos do vetor base (limiar 0,8)", r"Entrada candidata de P1 \((\d+) atributos\)"),
+    ("D2 do vetor base", r"d′ escolhido: \d+ componentes pela dimensão intrínseca \(D2 = ([\d.]+)\)"),
+    ("ρ-score do vetor base", r"ρ-score = ([\d.]+) \(mediana"),
+    ("d′ do vetor base (⌈D2⌉)", r"d′ escolhido: (\d+) componentes"),
+    ("d′ do vetor base (broken-stick)", r"alternativa compacta: (\d+) pelo broken-stick"),
     ("variância retida PCA base (%)", r"Matriz candidata no espaço PCA: \(\d+, \d+\); variância retida = ([\d.]+)%"),
     ("usuários atípicos", r"Atípicos \(b e c ao mesmo tempo\): ([\d,]+) usuários"),
     ("Hopkins PCA (percentis 1–99)", r"PCA \(\d+\)\s+todos\s+percentis 1–99\s+\d+\s+([\d.]+)"),
     ("grupos do perfil (vetor revisado)", r"Grupos do perfil: (\d+)"),
-    ("variância retida PCA revisado (%)", r"PCA do vetor revisado: d′ = \d+ \(Kaiser-Guttman, ([\d.]+)%"),
+    ("atributos do vetor revisado", r"Vetor revisado \((\d+) atributos\)"),
+    ("d′ do vetor revisado (⌈D2⌉)", r"PCA do vetor revisado: d′ = (\d+)"),
+    ("variância retida PCA revisado (%)", r"PCA do vetor revisado: d′ = \d+ \(dimensão intrínseca, ([\d.]+)%"),
 ]
 
 
