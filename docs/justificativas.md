@@ -27,7 +27,7 @@ Os números são os da v10, executada com os dados reais em 26/11/2026 no Mac (`
 | 11 | [Conversão dos gêneros do IMDb](#d11) | 2-B; 2.2-b | implementada (v6) |
 | 12 | [Conferência da chave MovieLens → IMDb por código](#d12) | 2-C; 2.2-b | implementada (19/11/2026, texto da 2.2-b) |
 | 13 | [Ano que falta e pedidos da D4](#d13) | D4; 2.2-b, 3.8-a | implementada (v6; teste do corte na v8) |
-| 14 | [Excluir os filmes que continuam sem gênero](#d14) | D6; 2.2-d | implementada (v7) |
+| 14 | [Excluir os filmes que continuam sem gênero](#d14) | D6, D8; 2.2-d | implementada (v7); mantida em 27/11/2026 |
 | 15 | [Amostras só para gráficos, com representatividade conferida](#d15) | 1.5-b, 2.4 | implementada (v5; sorteio pelo hash na v6) |
 | 16 | [Não imputar a matriz usuário × filme](#d16) | 2.5 | implementada (v5) |
 | | **Transformação (seção 3)** | | |
@@ -475,9 +475,11 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 
 *Registro: D6 (proposta 3), partes A, B e D. Notebook: 2.2-d. Análise: `analises/casos_sem_tratamento.py`.*
 
-**O que foi decidido.** Os 240 filmes que continuam sem gênero depois do IMDb saem dos dados-alvo, com 1.406 avaliações (0,0056% do total), sem kNN. A 2.2-c continua como validação. Com isso, o rótulo `Unknown` deixa de existir, e o perfil da 3.1 passa a ter 19 gêneros.
+**O que foi decidido.** Os 240 filmes que continuam sem gênero depois do IMDb saem dos dados-alvo, com 1.406 avaliações (0,0056% do total), sem kNN. A 2.2-c continua como validação. Com isso, o rótulo `Unknown` deixa de existir, e o perfil da 3.1 passa a ter 19 gêneros (18 desde a v10, com o IMAX fora).
 
 **Como chegou aqui.** Na v6, esses filmes ficavam como `Unknown`. A proposta 3 levou à mesa o princípio do aluno: excluir o que não tem tratamento automático e não pesa. A proposta dava gênero pelo kNN aos 55 filmes com 5 ou mais avaliadores e excluía os 178 com 1 a 4 e os 7 sem avaliação; a alternativa simples era excluir os 240, sem kNN. A mesa de 7 (19/11/2026, 7 aprovam com ajuste) preferiu a alternativa simples, e o aluno aceitou os ajustes no mesmo dia. A exclusão foi implementada na v7, na célula 2.2-d, depois da validação do kNN.
+
+Na revisão de 26/11/2026, o professor apontou que, excluídos, esses filmes nunca seriam sugeridos na P2. A proposta 5 (D8) chegou a aprovar que eles ficassem no conjunto, marcados como sem gênero. O aluno perguntou então se um preenchimento como o 1/√N, mesmo errando filme a filme, não manteria a distribuição; o teste mostrou que não (abaixo). Em 27/11/2026, o aluno decidiu manter a exclusão, também na P2: "não faz sentido excluir para depois usar, isso perde o sentido do tratamento de dados". A mesa aprovou manter a exclusão (7 × 0).
 
 **Por quê.**
 - *Não há tratamento automático:* no IMDb, 209 filmes só têm gêneros que não existem no MovieLens (145 só Short e 26 só Music), 16 não têm gênero e 15 têm código ausente.
@@ -489,6 +491,10 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 - *Sem ano (parte B):* 3 filmes, 2 avaliações. Os 2 avaliados estão entre os 240; o terceiro não tem avaliação. Não pedem regra própria.
 
 **Alternativas descartadas.**
+- *Deixar os 240 no conjunto, marcados como sem gênero (proposta 5, D8):* fariam parte de tudo que não depende de gênero e poderiam ser sugeridos na P2, mas a base ficaria com filmes sem gênero, e o perfil não ganha nada com eles (no teste abaixo, deixar sem gênero e excluir das proporções dão o mesmo perfil). Não foi implementada.
+- *Excluir das seções 2 e 3 e da P1, mas trazer os 240 de volta como itens na P2 (meio-termo sugerido pela mesa):* o aluno recusou, porque um mesmo dado teria dois tratamentos.
+- *Preencher com uma estratégia que mantenha a distribuição de gêneros (pedido do aluno, 26/11/2026):* nos 2.127 curtas com gênero conhecido, o gênero foi escondido e preenchido de cinco formas (`analises/preencher_genero_distribuicao.py`). Deixar sem gênero dá o menor erro médio no perfil do usuário (0,98 ponto percentual); a 1/√N com o gênero mais votado dá 1,32, e as versões fracionárias e o gênero mais comum, de 0,99 a 1,04. A distribuição de gêneros dos filmes preenchidos fica de 50 a 88 pontos (variação total) longe da verdadeira; a 1/√N com o mais votado é a mais distante. Nos 119 títulos que no IMDb só têm gêneros fora do MovieLens, a 1/√N erra um pouco menos no perfil (0,23 contra 0,29), mas fica a 63 pontos da distribuição verdadeira, em só 813 avaliações.
+- *kNN para os filmes com 50 ou mais avaliadores (Black Mirror e Sabotage):* rejeitado pela mesa (6 × 1). Na população dos curtas, a vantagem do kNN sobre o gênero mais comum fica abaixo dos 10 pontos exigidos em qualquer limite (7,8 pontos com 10–49 avaliadores, 6,3 com 50+, 1,4 com 100+).
 - *Manter como `Unknown` (v6):* mantém um atributo que mede falta de informação e gera atípicos.
 - *kNN para os 55 com 5 ou mais avaliadores, excluindo só os 178 com 1 a 4 e os 7 sem avaliação:* afetaria menos usuários (124, no máximo 2,6% das avaliações de um usuário, menor resto de 38), mas, no conjunto dos curtas com 5 ou mais avaliadores, o kNN não supera o chute.
 - *kNN para todos:* com 1–2 avaliadores, o kNN fica abaixo do chute (2.2-c).
@@ -500,10 +506,11 @@ O erro do kNN medido ali (16,6%) também entra na conta da alternativa D da deci
 - Na faixa de 10 a 49 avaliadores, o kNN supera o chute nos curtas (56,2% contra 48,4%); a decisão olhou o conjunto dos curtas com 5 ou mais avaliadores.
 - Black Mirror (456 avaliações) sai junto, com a chave errada registrada (decisão 12).
 - Um usuário fica com 19 avaliações; os outros continuam com pelo menos 20.
+- *Custo para a P2:* esses filmes não podem ser sugeridos. 127 dos 240 não têm nenhuma avaliação positiva, só 12 têm 5 ou mais, e só Black Mirror (382 positivas) passa do suporte de 0,1% dos usuários (163); com suportes menores, também Beastie Boys: Sabotage (50 positivas). Só 5.530 dos 62.423 filmes do catálogo chegam a esse suporte: o limite do que pode ser sugerido é a cauda longa, não o gênero.
 
 **Onde está a evidência.** 2.2-d; `analises/casos_sem_tratamento.py` → `analises/resultados_casos_sem_tratamento.txt` (partes A e B; na parte D, o teste do kNN nos curtas; na parte E, o da contagem 1/√N sem o IMAX); `docs/decisoes.md` (D6). Um grupo de 117 filmes parecidos com os 55, mas formado sobretudo por códigos ausentes do IMDb e longas, em que o kNN vai bem (62,4% contra 27,4%), está só no registro da D6; ele representa pouco os 55.
 
-**Status.** Implementada na v7 (19/11/2026).
+**Status.** Implementada na v7 (19/11/2026). Mantida em 27/11/2026, depois da proposta 5 (D8), valendo também para a P2.
 
 **Números finais (v7).** Saíram 240 filmes e 1.406 avaliações (0,0056% de 24.999.924, depois da fusão; limite 0,1%). 823 de 162.541 usuários foram afetados, com no máximo 5,0% das avaliações de um usuário (limite 10%), e nenhum perdeu todas: o critério de "não pesa" foi atendido. Depois da limpeza (fusão e exclusão), ficaram 24.998.518 avaliações, 62.176 filmes no catálogo, 58.807 filmes avaliados, 162.541 usuários e 19 gêneros. Todos os números de controle esperados, registrados antes da execução, bateram.
 

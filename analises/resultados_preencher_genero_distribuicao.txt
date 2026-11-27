@@ -1,0 +1,20 @@
+
+=== curtas do IMDb: 2,127 filmes, 89,738 avaliações, 31,949 usuários afetados ===
+                                        método  acerto por filme %  distância na distribuição geral (p.p.)  erro médio no perfil do usuário (p.p.)  p99 (p.p.)  máximo (p.p.)
+                    deixar sem gênero (marcar)                 NaN                                     NaN                                   0.976       5.061         50.000
+                 1/√N, só o gênero mais votado              33.945                                  87.669                                   1.317       7.407         70.556
+1/√N fracionário (todos os gêneros, pelo peso)             100.000                                  51.185                                   1.000       5.311         44.844
+                 público sem peso, fracionário             100.000                                  49.999                                   0.990       5.238         35.748
+                gênero mais comum da população              49.459                                  70.078                                   1.011       5.449         67.778
+       distribuição do catálogo (todos iguais)             100.000                                  51.150                                   1.036       5.535         41.760
+Distribuição verdadeira (5 maiores): {'Animation': np.float64(29.9), 'Comedy': np.float64(21.0), 'Children': np.float64(16.2), 'Crime': np.float64(5.2), 'Documentary': np.float64(5.1)}
+
+=== títulos só com gêneros fora do MovieLens: 119 filmes, 813 avaliações, 574 usuários afetados ===
+                                        método  acerto por filme %  distância na distribuição geral (p.p.)  erro médio no perfil do usuário (p.p.)  p99 (p.p.)  máximo (p.p.)
+                    deixar sem gênero (marcar)                 NaN                                     NaN                                   0.293       2.583          4.405
+                 1/√N, só o gênero mais votado              27.731                                  63.284                                   0.226       2.149          4.762
+1/√N fracionário (todos os gêneros, pelo peso)              99.160                                  64.287                                   0.342       3.254          4.435
+                 público sem peso, fracionário              99.160                                  48.693                                   0.310       2.593          4.521
+                gênero mais comum da população              42.017                                  61.726                                   0.296       3.558          5.000
+       distribuição do catálogo (todos iguais)             100.000                                  33.398                                   0.287       2.352          4.632
+Distribuição verdadeira (5 maiores): {'Documentary': np.float64(38.3), 'Drama': np.float64(31.3), 'Comedy': np.float64(18.5), 'Romance': np.float64(5.4), 'Fantasy': np.float64(1.8)}

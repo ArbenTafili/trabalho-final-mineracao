@@ -29,7 +29,9 @@ Anotações do aluno registradas em 25/11/2026, com uma nota sobre como cada uma
 
 7. **Função de distância entre filmes.** Mede se dois filmes estão próximos, por exemplo pelo Jaccard ou pelo cosseno entre os públicos (quem avaliou cada um), como na 2.2-c. Ela serve para agrupar filmes parecidos antes da mineração, ou para filtrar regras entre filmes que já são quase o mesmo público.
 
+8. **Cauda longa (sugestão da mesa na D8, 27/11/2026).** Com suporte de 0,1% dos usuários (163), só 5.530 dos 62.423 filmes do catálogo podem entrar numa regra; com 1%, só 1.562. É isso, e não a falta de gênero, que limita os filmes que podem ser sugeridos. Alavancas: suporte calculado dentro de cada grupo da P1 (um filme frequente num grupo gera regras ali), mais de um suporte comparado e regras em dois níveis (filme e gênero). Os 240 filmes excluídos na 2.2-d ficam fora também da P2 (decisão do aluno: um dado tem um tratamento só); o custo é Black Mirror (382 avaliações positivas) e, com suportes menores, Beastie Boys: Sabotage (50). Os 3.376 filmes do catálogo sem nenhuma avaliação não podem ser sugeridos por métodos baseados em avaliações (começo a frio, fora do escopo).
+
 ## Decisões da seção 3 que ainda estão abertas e afetam P1
 
-- **D5:** tirar o IMAX do perfil (é formato de exibição, não gênero) e juntar Animation e Children.
-- **Gêneros raros:** decidir o que fazer com o Musical e os demais gêneros raros, junto com o teste de sensibilidade do corte de 2% com War (D4).
+- **Desvios relativos por grupo na entrada principal (D7):** com eles, o PCA do vetor revisado guarda menos variância (9 componentes, 67,32%) e concentra mais as distâncias que o PCA do vetor base (7, 85,73%) e que o revisado sem os desvios (7, 80,34%). A entrada principal registrada continua o PCA do vetor revisado; P1 compara as três.
+- *Resolvidas desde a anotação:* D5 (IMAX fora, Animation e Children juntos; v8 e v10) e os gêneros raros com o teste do corte de 2% (D4; v8).

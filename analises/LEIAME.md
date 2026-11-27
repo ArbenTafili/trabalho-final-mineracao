@@ -11,6 +11,7 @@ Medições feitas **fora do notebook** para decidir, com números, o que entra n
 | `pca_criterios.py` | D7 (proposta 4) | PCA como no método da disciplina (min-max, centralizado, covariância) e o d′ de cada critério: % acumulada, broken-stick, Kaiser em escala, D2 e MLE; distribuição das distâncias no min-max e no PCA de cada d′ (`--com-dp-genero` acrescenta o desvio por gênero) |
 | `atributos_por_genero.py` | D7 (proposta 4) | cobertura e redundância da média e do desvio-padrão da nota por gênero em cada usuário, com e sem encolhimento |
 | `dimensao_por_genero.py` | D7 (proposta 4, item 10) | dimensionalidade intrínseca e d′ do PCA no público de cada gênero (10% mais altos), com n igual, pareamento por atividade, usuários sorteados e placebo; prévia, refazer com o vetor revisado da proposta 4 |
+| `preencher_genero_distribuicao.py` | D8 (proposta 5) | se preencher o gênero dos filmes sem gênero (1/√N, versões fracionárias, gênero mais comum, distribuição do catálogo) mantém a distribuição: em curtas com gênero conhecido, escondido, mede a distância da distribuição verdadeira e o erro no perfil de cada usuário |
 
 Para rodar (da raiz do repositório):
 
@@ -22,10 +23,10 @@ Para rodar (da raiz do repositório):
 cd analises && ../.venv/bin/python imputacao_por_faixa.py && ../.venv/bin/python imdb.py && ../.venv/bin/python chave_imdb.py && ../.venv/bin/python casos_sem_tratamento.py
 ```
 
-Os da proposta 4 não usam o IMDb:
+Os da revisão de 26/11/2026 (D7 e D8); só o último usa o recorte do IMDb:
 
 ```bash
-cd analises && ../.venv/bin/python pca_criterios.py && ../.venv/bin/python atributos_por_genero.py && ../.venv/bin/python dimensao_por_genero.py
+cd analises && ../.venv/bin/python pca_criterios.py && ../.venv/bin/python atributos_por_genero.py && ../.venv/bin/python dimensao_por_genero.py && ../.venv/bin/python preencher_genero_distribuicao.py
 ```
 
 Arquivo do IMDb usado nos resultados gravados: `title.basics.tsv.gz` baixado em 18/11/2026, MD5 `694fa9cd5bad4d6f3f94384b7ed61c74`. O IMDb atualiza o arquivo todo dia, então um download novo pode mudar os números na última casa.
